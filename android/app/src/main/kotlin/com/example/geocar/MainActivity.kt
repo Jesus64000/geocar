@@ -1,4 +1,4 @@
-package com.testingcode.geocar
+package com.example.geocar
 
 import io.flutter.embedding.android.FlutterActivity
 

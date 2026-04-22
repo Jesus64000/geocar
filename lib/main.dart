@@ -1,31 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'features/auth/splash_screen.dart';
+import 'core/theme/app_theme.dart';
 
-void main() {
+// Controlador global para cambiar el tema en tiempo real
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // TODO: Inicializar Firebase aquí en el Sprint 1
-  runApp(const TestingCodeApp());
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  runApp(const GeocarApp());
 }
 
-class TestingCodeApp extends StatelessWidget {
-  const TestingCodeApp({super.key});
+class GeocarApp extends StatelessWidget {
+  const GeocarApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Talleres Cabimas',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E3A8A)),
-        useMaterial3: true,
-      ),
-      home: const Scaffold(
-        body: Center(
-          child: Text(
-            'TestingCode: Setup Inicial Completo 🚀',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ),
+    // Escuchamos el cambio de tema para repintar la app entera
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (_, ThemeMode currentMode, _) {
+        return MaterialApp(
+          title: 'Geocar',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,   // Conectamos el tema claro
+          darkTheme: AppTheme.darkTheme, // Conectamos el tema oscuro
+          themeMode: currentMode,       // Decide cuál usar según el controlador
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }
