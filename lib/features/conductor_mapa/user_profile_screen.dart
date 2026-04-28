@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Importante
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../auth/welcome_role_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -12,11 +12,14 @@ class UserProfileScreen extends StatefulWidget {
 }
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
-  // Controladores ahora inician vacíos
   final TextEditingController _nombreController = TextEditingController();
-  final TextEditingController _vehiculoController = TextEditingController();
-  bool _isLoading = true; // Iniciamos en true para la carga inicial
-  bool _isSaving = false; // Para el estado del botón de guardar
+
+  // --- LÓGICA DEL GARAGE ---
+  List<Map<String, dynamic>> _misVehiculos = [];
+  // -------------------------
+
+  bool _isLoading = true;
+  bool _isSaving = false;
 
   final User? _user = FirebaseAuth.instance.currentUser;
 
@@ -26,7 +29,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     _cargarDatosUsuario();
   }
 
-  // PASO 1: Cargar datos reales de Firestore
   Future<void> _cargarDatosUsuario() async {
     if (_user == null) return;
 
@@ -38,9 +40,23 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
       if (doc.exists) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
         setState(() {
           _nombreController.text = data['nombre'] ?? '';
-          _vehiculoController.text = data['vehiculo'] ?? '';
+
+          // Cargamos la lista de vehículos
+          if (data['vehiculos'] != null && data['vehiculos'] is List) {
+            _misVehiculos = List<Map<String, dynamic>>.from(data['vehiculos']);
+          }
+          // MIGRACIÓN: Si el usuario tenía el formato viejo, lo convertimos al nuevo
+          else if (data['vehiculo'] != null && data['vehiculo'].toString().isNotEmpty) {
+            _misVehiculos = [{
+              'marca': 'Mi Vehículo',
+              'modelo': data['vehiculo'],
+              'año': 'N/A'
+            }];
+          }
+
           _isLoading = false;
         });
       } else {
@@ -55,14 +71,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   @override
   void dispose() {
     _nombreController.dispose();
-    _vehiculoController.dispose();
     super.dispose();
   }
 
-  // PASO 2: Guardado real en la base de datos
   void _guardarPerfil() async {
     if (_nombreController.text.isEmpty) {
       _showSnackBar('El nombre no puede estar vacío', Colors.redAccent);
+      return;
+    }
+
+    if (_misVehiculos.isEmpty) {
+      _showSnackBar('Debes tener al menos un vehículo en tu Garage', Colors.orange);
       return;
     }
 
@@ -74,11 +93,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           .doc(_user!.uid)
           .update({
         'nombre': _nombreController.text.trim(),
-        'vehiculo': _vehiculoController.text.trim(),
+        'vehiculos': _misVehiculos, // Guardamos el array completo
       });
 
       if (!mounted) return;
-      _showSnackBar('¡Perfil actualizado correctamente!', Colors.green);
+      _showSnackBar('¡Perfil y Garage actualizados!', Colors.green);
       Navigator.pop(context);
     } catch (e) {
       _showSnackBar('Error al guardar: $e', Colors.redAccent);
@@ -87,7 +106,78 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
+  // --- MODAL PARA AGREGAR VEHÍCULO ---
+  void _mostrarDialogoAgregarVehiculo() {
+    final marcaController = TextEditingController();
+    final modeloController = TextEditingController();
+    final anioController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                  child: Container(
+                      width: 50, height: 5,
+                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10))
+                  )
+              ),
+              const SizedBox(height: 24),
+              Text('Nuevo Vehículo', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+
+              _buildModernInput(controller: marcaController, hintText: 'Marca (Ej: Toyota)', icon: Icons.branding_watermark_rounded, colorScheme: Theme.of(context).colorScheme),
+              const SizedBox(height: 12),
+              _buildModernInput(controller: modeloController, hintText: 'Modelo (Ej: Corolla)', icon: Icons.directions_car_rounded, colorScheme: Theme.of(context).colorScheme),
+              const SizedBox(height: 12),
+              _buildModernInput(controller: anioController, hintText: 'Año (Ej: 2008)', icon: Icons.calendar_month_rounded, colorScheme: Theme.of(context).colorScheme, isNumber: true),
+
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: () {
+                  if (marcaController.text.isEmpty || modeloController.text.isEmpty || anioController.text.isEmpty) {
+                    _showSnackBar('Llena todos los campos', Colors.redAccent);
+                    return;
+                  }
+                  setState(() {
+                    _misVehiculos.add({
+                      'marca': marcaController.text.trim(),
+                      'modelo': modeloController.text.trim(),
+                      'año': anioController.text.trim(),
+                    });
+                  });
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.surface,
+                  minimumSize: const Size(double.infinity, 56),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+                child: Text('AGREGAR AL GARAGE', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showSnackBar(String message, Color color) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message, style: GoogleFonts.poppins()),
@@ -154,24 +244,62 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ),
                   const SizedBox(height: 24),
 
+                  // BENTO BOX DEL GARAGE
                   _buildBentoBox(
                     colorScheme: colorScheme,
-                    title: 'Mi Vehículo',
-                    icon: Icons.directions_car_rounded,
+                    title: 'Mi Garage',
+                    icon: Icons.garage_rounded,
                     accentColor: colorScheme.secondary,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('El mecánico verá esto para saber qué reparar.',
+                        Text('Agrega tus vehículos. Cuando pidas auxilio, podrás elegir cuál está fallando.',
                             style: GoogleFonts.poppins(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.5))
                         ),
                         const SizedBox(height: 16),
-                        _buildModernInput(
-                            controller: _vehiculoController,
-                            hintText: 'Ej: Toyota Corolla 2008',
-                            icon: Icons.car_repair_rounded,
-                            colorScheme: colorScheme
-                        ),
+
+                        if (_misVehiculos.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16.0),
+                            child: Text('No tienes vehículos registrados.', style: GoogleFonts.poppins(fontStyle: FontStyle.italic, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                          ),
+
+                        // Lista de Carros
+                        ..._misVehiculos.asMap().entries.map((entry) {
+                          int index = entry.key;
+                          Map<String, dynamic> vehiculo = entry.value;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+                            ),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                                child: Icon(Icons.directions_car_rounded, color: colorScheme.primary),
+                              ),
+                              title: Text('${vehiculo['marca']} ${vehiculo['modelo']}', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14)),
+                              subtitle: Text('Año: ${vehiculo['año']}', style: GoogleFonts.poppins(fontSize: 12)),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                                onPressed: () {
+                                  setState(() => _misVehiculos.removeAt(index));
+                                },
+                              ),
+                            ),
+                          );
+                        }),
+
+                        // Botón Añadir
+                        Center(
+                          child: TextButton.icon(
+                            onPressed: _mostrarDialogoAgregarVehiculo,
+                            icon: Icon(Icons.add_circle_outline_rounded, color: colorScheme.primary),
+                            label: Text('Añadir Vehículo', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: colorScheme.primary)),
+                          ),
+                        )
                       ],
                     ),
                   ),
@@ -259,9 +387,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  Widget _buildModernInput({required TextEditingController controller, required String hintText, required IconData icon, required ColorScheme colorScheme}) {
+  Widget _buildModernInput({required TextEditingController controller, required String hintText, required IconData icon, required ColorScheme colorScheme, bool isNumber = false}) {
     return TextFormField(
       controller: controller,
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
       decoration: InputDecoration(
         hintText: hintText,

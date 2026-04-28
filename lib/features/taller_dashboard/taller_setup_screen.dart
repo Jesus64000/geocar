@@ -7,6 +7,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart'; // Importante
 import 'package:geolocator/geolocator.dart'; // Importante
 import 'taller_dashboard_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 
 class TallerSetupScreen extends StatefulWidget {
   const TallerSetupScreen({super.key});
@@ -167,22 +169,33 @@ class _TallerSetupScreenState extends State<TallerSetupScreen> {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(22),
                             child: GoogleMap(
-                              initialCameraPosition: CameraPosition(target: _ubicacionActual, zoom: 14),
+                              initialCameraPosition: CameraPosition(target: _ubicacionActual, zoom: 15),
                               onMapCreated: (controller) => _mapController.complete(controller),
                               onTap: (LatLng point) => setState(() { _ubicacionActual = point; }),
-                              scrollGesturesEnabled: true, // Permite mover el mapa con el dedo
-                              zoomGesturesEnabled: true,   // Permite hacer zoom
-                              myLocationEnabled: true,     // Muestra el punto azul de donde estás
-                              myLocationButtonEnabled: true, // Botón para volver a tu posición real
+
+                              // CONFIGURACIÓN DE GESTOS NATURALES (EFECTO YUMMY)
+                              scrollGesturesEnabled: true,
+                              zoomGesturesEnabled: true,
+                              rotateGesturesEnabled: true,
+                              tiltGesturesEnabled: true,
+                              myLocationEnabled: true,
+                              myLocationButtonEnabled: true,
                               zoomControlsEnabled: false,
-                              mapToolbarEnabled: false,
+
+                              // ESTA LÍNEA ES LA MAGIA:
+                              // Evita que el scroll de la pantalla interfiera con el del mapa
+                              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                                Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
+                              },
+
                               markers: {
                                 Marker(
                                   markerId: const MarkerId('taller_pos'),
                                   position: _ubicacionActual,
-                                  draggable: true, // Permite arrastrar el pin
+                                  draggable: true,
+                                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
                                   onDragEnd: (LatLng point) => setState(() { _ubicacionActual = point; }),
-                                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),),
+                                ),
                               },
                             ),
                           ),
