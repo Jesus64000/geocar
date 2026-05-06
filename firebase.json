@@ -1,1 +1,36 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"geocar-84047","appId":"1:288138752009:android:072d5a3e8389ecd7f908d8","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"geocar-84047","configurations":{"android":"1:288138752009:android:072d5a3e8389ecd7f908d8","web":"1:288138752009:web:be68b1b765021e70f908d8"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "geocar-84047",
+          "appId": "1:288138752009:android:072d5a3e8389ecd7f908d8",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "geocar-84047",
+          "configurations": {
+            "android": "1:288138752009:android:072d5a3e8389ecd7f908d8",
+            "web": "1:288138752009:web:be68b1b765021e70f908d8"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ]
+}

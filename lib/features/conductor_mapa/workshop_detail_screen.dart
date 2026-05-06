@@ -1,53 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+// IMPORTANTE: Ajusta estas rutas según tu estructura de carpetas real
+import '../taller_dashboard/taller_rescue_screen.dart';
+import '../../widgets/chat/universal_chat_sheet.dart';
 
 class WorkshopDetailScreen extends StatelessWidget {
   final Map<String, dynamic> data;
   final String tallerId;
 
   const WorkshopDetailScreen({super.key, required this.data, required this.tallerId});
-
-  Future<void> _abrirWhatsApp(BuildContext context, String? phone, String? name) async {
-    if (phone == null || phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Número no disponible')));
-      return;
-    }
-    String cleanedPhone = phone.replaceAll(RegExp(r'\D'), '');
-    if (!cleanedPhone.startsWith('58')) cleanedPhone = '58$cleanedPhone';
-
-    var message = "Hola $name, vi tu perfil en Geocar y necesito ayuda con mi vehículo.";
-    var url = "https://wa.me/$cleanedPhone?text=${Uri.encodeComponent(message)}";
-
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    }
-  }
-
-  Future<void> _abrirRutaExterna(BuildContext context, GeoPoint? pos) async {
-    if (pos == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ubicación no disponible'))
-      );
-      return;
-    }
-
-    // CORRECCIÓN: Se agregó el '$' antes de la llave
-    final String googleMapsUrl = "https://www.google.com/maps/dir/?api=1&destination=${pos.latitude},${pos.longitude}&travelmode=driving";
-
-    final Uri url = Uri.parse(googleMapsUrl);
-
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se pudo abrir el mapa'))
-        );
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -150,18 +115,37 @@ class WorkshopDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 40),
 
-                  // BOTONES DE ACCIÓN (WhatsApp y Ruta)
+                  // BOTONES DE ACCIÓN (Chat In-App y Ruta In-App)
                   Row(
                     children: [
+                      // BOTÓN DE CHAT IN-APP (Reemplaza al WhatsApp directo)
                       Expanded(
                         flex: 2,
                         child: ElevatedButton.icon(
-                          onPressed: () => _abrirWhatsApp(context, data['telefono'], data['nombre']),
+                          onPressed: () {
+                            // Sacamos el UID del conductor para armar la sala de chat única
+                            final String miUid = FirebaseAuth.instance.currentUser?.uid ?? 'conductor_anonimo';
+
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) => Padding(
+                                padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+                                child: UniversalChatSheet(
+                                  modo: ChatMode.directo,
+                                  referenceId: '${tallerId}_$miUid', // ID combinado para sala única
+                                  tallerPhone: data['telefono'] ?? '',
+                                  miRol: 'conductor',
+                                ),
+                              ),
+                            );
+                          },
                           icon: const Icon(Icons.chat_bubble_rounded),
                           label: Text('CONTACTAR', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
+                            backgroundColor: colorScheme.primary, // Cambiado a color primario para denotar acción In-App
+                            foregroundColor: colorScheme.onPrimary,
                             padding: const EdgeInsets.symmetric(vertical: 20),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                             elevation: 0,
@@ -169,10 +153,27 @@ class WorkshopDetailScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 16),
+                      // BOTÓN DE NAVEGACIÓN
                       Expanded(
                         flex: 1,
                         child: ElevatedButton(
-                          onPressed: () => _abrirRutaExterna(context, data['position']),
+                          onPressed: () {
+                            GeoPoint? pos = data['position'];
+                            if (pos != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => TallerRescueScreen(
+                                    emergenciaId: "DIRECTORIO",
+                                    destinoManual: LatLng(pos.latitude, pos.longitude),
+                                    nombreDestino: data['nombre'],
+                                  ),
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ubicación no disponible')));
+                            }
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
                             foregroundColor: colorScheme.primary,
@@ -180,7 +181,7 @@ class WorkshopDetailScreen extends StatelessWidget {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                             elevation: 0,
                           ),
-                          child: const Icon(Icons.directions_rounded, size: 28),
+                          child: const Icon(Icons.navigation_rounded, size: 28),
                         ),
                       ),
                     ],

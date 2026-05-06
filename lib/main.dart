@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'features/auth/splash_screen.dart';
 import 'core/theme/app_theme.dart';
+import 'services/push_notification_service.dart';
 
 // Controlador global para cambiar el tema en tiempo real
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
@@ -12,6 +13,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await PushNotificationService.inicializar();
   runApp(const GeocarApp());
 }
 

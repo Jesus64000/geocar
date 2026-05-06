@@ -27,8 +27,12 @@ dependencies:
   shared_preferences: ^2.5.5 # Para guardar sesiones offline
   url_launcher: ^6.3.2
   flutter_polyline_points: ^3.1.0
-  image_picker: ^1.2.1
+  image_picker: ^1.2.2
   firebase_storage: ^12.4.10
+  flutter_tts: ^4.2.5
+  http: ^1.6.0
+  firebase_messaging: ^15.2.10
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:

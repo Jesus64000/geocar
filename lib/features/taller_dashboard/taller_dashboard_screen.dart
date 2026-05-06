@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+// Importaciones de pantallas (Rutas locales limpias)
 import 'taller_profile_screen.dart';
-import 'taller_reviews_screen.dart';
 import 'taller_rescue_screen.dart';
+import 'taller_reviews_screen.dart'; // Solo una vez
+
+// FIX: Ruta de la bandeja de entrada
+import '../../models/chat_inbox_screen.dart';
 
 class TallerDashboardScreen extends StatefulWidget {
   const TallerDashboardScreen({super.key});
@@ -15,12 +20,53 @@ class TallerDashboardScreen extends StatefulWidget {
 
 class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
   final String _uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+  bool _procesandoRescate = false; // Bloqueo de UI mientras transacciona
 
   // Función para cambiar el estado de Abierto/Cerrado
   Future<void> _toggleEstado(bool actual) async {
     await FirebaseFirestore.instance.collection('talleres').doc(_uid).update({
       'estado': actual ? 'cerrado' : 'abierto',
     });
+  }
+
+  // LÓGICA CORE: Transacción Atómica para adueñarse de la emergencia
+  Future<void> _tomarRescate(String idEmergencia) async {
+    setState(() => _procesandoRescate = true);
+    final docRef = FirebaseFirestore.instance.collection('emergencias').doc(idEmergencia);
+
+    try {
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        DocumentSnapshot snapshot = await transaction.get(docRef);
+
+        if (!snapshot.exists) throw "La emergencia ya no existe o fue cancelada.";
+
+        String estado = snapshot.get('estado');
+        if (estado != 'activa') throw "Este rescate ya fue tomado por otro taller.";
+
+        // Bloqueamos la emergencia para este taller
+        transaction.update(docRef, {
+          'estado': 'en_camino',
+          'taller_id': _uid,
+          'aceptado_at': FieldValue.serverTimestamp(),
+        });
+      });
+
+      // Éxito: Navegamos a la pantalla de rescate
+      if (mounted) {
+        setState(() => _procesandoRescate = false);
+        Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => TallerRescueScreen(emergenciaId: idEmergencia))
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _procesandoRescate = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.toString()), backgroundColor: Colors.orange)
+        );
+      }
+    }
   }
 
   @override
@@ -43,6 +89,10 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
           var data = snapshot.data!.data() as Map<String, dynamic>;
           bool estaAbierto = data['estado'] == 'abierto';
           String nombreTaller = data['nombre'] ?? 'Mi Taller';
+          double rating = (data['rating'] ?? 5.0).toDouble(); // Rating real
+
+          // --- ANALYTICS EN VIVO ---
+          int visitas = data['visitas'] ?? 0; // Extrae visitas reales, si no hay, es 0
 
           return CustomScrollView(
             physics: const BouncingScrollPhysics(),
@@ -87,15 +137,15 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Column(
                     children: [
-                      // 2. RADAR SOS EN VIVO (Escucha la colección 'emergencias')
+                      // 2. RADAR SOS EN VIVO
                       StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance.collection('emergencias').where('estado', isEqualTo: 'activa').snapshots(),
                         builder: (context, sosSnapshot) {
                           if (!sosSnapshot.hasData || sosSnapshot.data!.docs.isEmpty) {
-                            return const SizedBox.shrink(); // No hay emergencias, se oculta
+                            return const SizedBox.shrink();
                           }
 
-                          // Si hay emergencias, mostramos la primera
+                          var emergenciaId = sosSnapshot.data!.docs.first.id;
                           var emergencia = sosSnapshot.data!.docs.first.data() as Map<String, dynamic>;
                           String vehiculo = emergencia['vehiculo'] ?? 'Vehículo Desconocido';
 
@@ -123,22 +173,15 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
                                   ),
                                 ),
                                 ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                            builder: (context) => TallerRescueScreen(
-                                              emergenciaId: sosSnapshot.data!.docs.first.id,
-                                            )
-                                        )
-                                    );
-                                  },
+                                  onPressed: _procesandoRescate ? null : () => _tomarRescate(emergenciaId),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                     foregroundColor: Colors.redAccent,
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                   ),
-                                  child: Text('VER', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                                  child: _procesandoRescate
+                                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                      : Text('TOMAR', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
                                 )
                               ],
                             ),
@@ -146,7 +189,7 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
                         },
                       ),
 
-                      // 3. SWITCH GIGANTE DE ESTADO (BENTO ANCHO)
+                      // 3. SWITCH GIGANTE DE ESTADO
                       _buildBentoContainer(
                         color: estaAbierto ? Colors.green.shade500 : Colors.red.shade400,
                         onTap: () => _toggleEstado(estaAbierto),
@@ -172,7 +215,7 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // 4. MÉTRICAS GEMELAS (BENTO ROW)
+                      // 4. MÉTRICAS GEMELAS
                       Row(
                         children: [
                           Expanded(
@@ -184,7 +227,7 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
                                 children: [
                                   const Icon(Icons.star_rounded, size: 36, color: Colors.amber),
                                   const SizedBox(height: 8),
-                                  Text('4.8', style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold)),
+                                  Text(rating.toStringAsFixed(1), style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold)),
                                   Text('Reputación', style: GoogleFonts.poppins(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.6))),
                                 ],
                               ),
@@ -199,7 +242,8 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
                                 children: [
                                   Icon(Icons.visibility_rounded, size: 36, color: colorScheme.primary),
                                   const SizedBox(height: 8),
-                                  Text('124', style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold)),
+                                  // --- INYECCIÓN DE VARIABLE DINÁMICA ---
+                                  Text(visitas.toString(), style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold)),
                                   Text('Visitas al Perfil', style: GoogleFonts.poppins(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.6))),
                                 ],
                               ),
@@ -209,7 +253,7 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // 5. ACCESOS RÁPIDOS (BENTO ANCHO CON COLUMNAS)
+                      // 5. ACCESOS RÁPIDOS
                       _buildBentoContainer(
                         color: colorScheme.surface,
                         border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
@@ -218,8 +262,15 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
                           children: [
                             _buildQuickAction(
                                 context,
+                                icon: Icons.forum_rounded,
+                                label: "Mensajes",
+                                color: Colors.green,
+                                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ChatInboxScreen(miRol: 'taller')))
+                            ),
+                            _buildQuickAction(
+                                context,
                                 icon: Icons.add_a_photo_rounded,
-                                label: "Subir Fotos",
+                                label: "Fotos",
                                 color: Colors.blue,
                                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TallerProfileScreen()))
                             ),
@@ -229,15 +280,6 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
                                 label: "Reseñas",
                                 color: Colors.orange,
                                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TallerReviewsScreen()))
-                            ),
-                            _buildQuickAction(
-                                context,
-                                icon: Icons.workspace_premium_rounded,
-                                label: "VIP",
-                                color: Colors.purple,
-                                onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Funcionalidad Premium en desarrollo')));
-                                }
                             ),
                           ],
                         ),
@@ -254,7 +296,7 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
     );
   }
 
-  // --- COMPONENTES BENTO MEJORADOS ---
+  // --- COMPONENTES BENTO ---
 
   Widget _buildBentoContainer({required Widget child, Color? color, VoidCallback? onTap, BoxBorder? border}) {
     return GestureDetector(
@@ -264,7 +306,7 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(32), // Esquinas bien redondas tipo iOS 18
+          borderRadius: BorderRadius.circular(32),
           border: border,
         ),
         child: child,
