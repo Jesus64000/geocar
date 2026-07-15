@@ -9,6 +9,9 @@ import 'taller_dashboard_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class TallerSetupScreen extends StatefulWidget {
   const TallerSetupScreen({super.key});
@@ -33,6 +36,13 @@ class _TallerSetupScreenState extends State<TallerSetupScreen> {
   ];
 
   bool _isLoading = false;
+
+  // --- LÓGICA DE FOTOS ---
+  final ImagePicker _picker = ImagePicker();
+  String? _photoUrl;
+  final List<String> _fotosGaleria = [];
+  bool _isUploadingPerfil = false;
+  bool _isUploadingGaleria = false;
 
   @override
   void initState() {
@@ -60,11 +70,32 @@ class _TallerSetupScreenState extends State<TallerSetupScreen> {
   }
 
   Future<void> _completarSetup() async {
-    // Validación de seguridad: Nombre, Especialidades y Teléfono
-    if (_nombreController.text.isEmpty ||
-        _serviciosSeleccionados.isEmpty ||
-        _telefonoController.text.isEmpty) {
-      _showSnackBar('Completa todos los campos y selecciona tus servicios', Colors.redAccent);
+    final nombreLimpio = _nombreController.text.trim();
+    final telefonoLimpio = _telefonoController.text.trim();
+
+    if (nombreLimpio.isEmpty || nombreLimpio.length < 3) {
+      _showSnackBar('El nombre del taller debe tener al menos 3 caracteres', Colors.redAccent);
+      return;
+    }
+
+    final phoneRegExp = RegExp(r'^\+?[0-9\s\-]{7,15}$');
+    if (telefonoLimpio.isEmpty || !phoneRegExp.hasMatch(telefonoLimpio)) {
+      _showSnackBar('Ingresa un número de teléfono válido (solo números, mínimo 7 dígitos)', Colors.redAccent);
+      return;
+    }
+
+    if (_serviciosSeleccionados.isEmpty) {
+      _showSnackBar('Selecciona al menos un servicio o especialidad', Colors.redAccent);
+      return;
+    }
+
+    if (_photoUrl == null || _photoUrl!.isEmpty) {
+      _showSnackBar('La foto de perfil del taller es obligatoria', Colors.redAccent);
+      return;
+    }
+
+    if (_fotosGaleria.length < 3) {
+      _showSnackBar('Debes subir al menos 3 fotos del local (${_fotosGaleria.length}/3 subidas)', Colors.redAccent);
       return;
     }
 
@@ -77,8 +108,8 @@ class _TallerSetupScreenState extends State<TallerSetupScreen> {
         // Guardamos todo en el documento del Taller
         await FirebaseFirestore.instance.collection('talleres').doc(user.uid).set({
           'uid': user.uid,
-          'nombre': _nombreController.text.trim(),
-          'telefono': _telefonoController.text.trim(),
+          'nombre': nombreLimpio,
+          'telefono': telefonoLimpio,
           'especialidades': _serviciosSeleccionados,
           'correo': user.email,
           'estado': 'cerrado', // Por defecto inicia cerrado
@@ -88,9 +119,9 @@ class _TallerSetupScreenState extends State<TallerSetupScreen> {
             'cierre': '17:00',
             'dias_laborales': ['Lun', 'Mar', 'Mie', 'Jue', 'Vie'],
           },
-          // ESTO ES EL PUNTO 2: El GeoPoint con la ubicación del mapa
+          'photoUrl': _photoUrl,
+          'fotos': _fotosGaleria,
           'position': GeoPoint(_ubicacionActual.latitude, _ubicacionActual.longitude),
-
           'fecha_registro': FieldValue.serverTimestamp(),
           'rol': 'taller',
         });
@@ -113,6 +144,62 @@ class _TallerSetupScreenState extends State<TallerSetupScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(text, style: GoogleFonts.poppins()), backgroundColor: color, behavior: SnackBarBehavior.floating),
     );
+  }
+
+  Future<void> _subirFotoPerfil() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 60);
+      if (image == null) return;
+
+      setState(() => _isUploadingPerfil = true);
+
+      File file = File(image.path);
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      Reference ref = FirebaseStorage.instance.ref().child('talleres/${user.uid}/perfil.jpg');
+      UploadTask uploadTask = ref.putFile(file);
+      TaskSnapshot snapshot = await uploadTask;
+      String downloadUrl = await snapshot.ref.getDownloadURL();
+
+      setState(() {
+        _photoUrl = downloadUrl;
+      });
+      _showSnackBar('¡Foto de perfil cargada!', Colors.green);
+    } catch (e) {
+      _showSnackBar('Error al subir foto de perfil: $e', Colors.redAccent);
+    } finally {
+      if (mounted) setState(() => _isUploadingPerfil = false);
+    }
+  }
+
+  Future<void> _subirFotoGaleria() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      if (image == null) return;
+
+      setState(() => _isUploadingGaleria = true);
+
+      File file = File(image.path);
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      String nombreArchivo = DateTime.now().millisecondsSinceEpoch.toString();
+      Reference ref = FirebaseStorage.instance.ref().child('talleres/${user.uid}/galeria/$nombreArchivo.jpg');
+
+      UploadTask uploadTask = ref.putFile(file);
+      TaskSnapshot snapshot = await uploadTask;
+      String downloadUrl = await snapshot.ref.getDownloadURL();
+
+      setState(() {
+        _fotosGaleria.add(downloadUrl);
+      });
+      _showSnackBar('¡Foto añadida a la galería!', Colors.green);
+    } catch (e) {
+      _showSnackBar('Error al subir foto de galería: $e', Colors.redAccent);
+    } finally {
+      if (mounted) setState(() => _isUploadingGaleria = false);
+    }
   }
 
   @override
@@ -249,6 +336,112 @@ class _TallerSetupScreenState extends State<TallerSetupScreen> {
                           ),
                         );
                       }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // SECCIÓN 4: FOTOS OBLIGATORIAS (Mínimo 1 perfil, 3 de local)
+                  _buildBentoSection(
+                    colorScheme: colorScheme,
+                    title: 'Fotos Obligatorias',
+                    icon: Icons.camera_alt_rounded,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Foto de Perfil / Logo
+                        Text('Foto de Perfil o Logotipo', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14)),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: _subirFotoPerfil,
+                              child: Container(
+                                height: 80,
+                                width: 80,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+                                  image: _photoUrl != null
+                                      ? DecorationImage(image: NetworkImage(_photoUrl!), fit: BoxFit.cover)
+                                      : null,
+                                ),
+                                child: _isUploadingPerfil
+                                    ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                                    : (_photoUrl == null
+                                        ? Icon(Icons.add_a_photo_rounded, color: colorScheme.primary)
+                                        : null),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                _photoUrl == null
+                                    ? 'Toca para subir la foto principal de tu taller (obligatoria)'
+                                    : '¡Foto principal cargada correctamente!',
+                                style: GoogleFonts.poppins(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.6)),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        const Divider(),
+                        const SizedBox(height: 12),
+                        // Fotos del local / Galería
+                        Text('Fotos de tu Local (Mínimo 3)', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14)),
+                        const SizedBox(height: 4),
+                        Text('Agrega fotos de tu fachada, equipos o instalaciones para generar confianza.', style: GoogleFonts.poppins(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.5))),
+                        const SizedBox(height: 12),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              ..._fotosGaleria.map((url) => Container(
+                                margin: const EdgeInsets.only(right: 12),
+                                height: 80,
+                                width: 80,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
+                                  image: DecorationImage(image: NetworkImage(url), fit: BoxFit.cover),
+                                ),
+                                child: Align(
+                                  alignment: Alignment.topRight,
+                                  child: GestureDetector(
+                                    onTap: () => setState(() => _fotosGaleria.remove(url)),
+                                    child: const CircleAvatar(
+                                      radius: 12,
+                                      backgroundColor: Colors.redAccent,
+                                      child: Icon(Icons.close, size: 14, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              )),
+                              if (_fotosGaleria.length < 5)
+                                GestureDetector(
+                                  onTap: _subirFotoGaleria,
+                                  child: Container(
+                                    height: 80,
+                                    width: 80,
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.surface,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+                                    ),
+                                    child: _isUploadingGaleria
+                                        ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                                        : Icon(Icons.add_photo_alternate_rounded, color: colorScheme.primary),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text('Fotos subidas: ${_fotosGaleria.length} de 3 requeridas',
+                            style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: _fotosGaleria.length >= 3 ? Colors.green : Colors.orange)),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 40),

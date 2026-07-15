@@ -1,8 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../auth/welcome_role_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import '../auth/auth_screen.dart';
+import '../../main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -21,6 +26,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
 
+  // --- IMAGEN DE PERFIL ---
+  String? _photoUrl;
+  bool _isUploadingPhoto = false;
+  final ImagePicker _picker = ImagePicker();
+
   final User? _user = FirebaseAuth.instance.currentUser;
 
   @override
@@ -35,7 +45,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     try {
       DocumentSnapshot doc = await FirebaseFirestore.instance
           .collection('usuarios')
-          .doc(_user!.uid)
+          .doc(_user.uid)
           .get();
 
       if (doc.exists) {
@@ -43,6 +53,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
         setState(() {
           _nombreController.text = data['nombre'] ?? '';
+          _photoUrl = data['photoUrl'];
 
           // Cargamos la lista de vehículos
           if (data['vehiculos'] != null && data['vehiculos'] is List) {
@@ -75,8 +86,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   void _guardarPerfil() async {
-    if (_nombreController.text.isEmpty) {
-      _showSnackBar('El nombre no puede estar vacío', Colors.redAccent);
+    final nombreLimpio = _nombreController.text.trim();
+    if (nombreLimpio.isEmpty || nombreLimpio.length < 3) {
+      _showSnackBar('El nombre completo debe tener al menos 3 caracteres', Colors.redAccent);
+      return;
+    }
+
+    if (_photoUrl == null || _photoUrl!.isEmpty) {
+      _showSnackBar('La foto de perfil es obligatoria para los conductores.', Colors.redAccent);
       return;
     }
 
@@ -147,15 +164,24 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: () {
-                  if (marcaController.text.isEmpty || modeloController.text.isEmpty || anioController.text.isEmpty) {
+                  final marca = marcaController.text.trim();
+                  final modelo = modeloController.text.trim();
+                  final anio = anioController.text.trim();
+                  if (marca.isEmpty || modelo.isEmpty || anio.isEmpty) {
                     _showSnackBar('Llena todos los campos', Colors.redAccent);
+                    return;
+                  }
+                  final int? yearValue = int.tryParse(anio);
+                  final int currentYear = DateTime.now().year;
+                  if (yearValue == null || yearValue < 1886 || yearValue > currentYear + 1) {
+                    _showSnackBar('Ingresa un año de vehículo válido (1886 - ${currentYear + 1})', Colors.redAccent);
                     return;
                   }
                   setState(() {
                     _misVehiculos.add({
-                      'marca': marcaController.text.trim(),
-                      'modelo': modeloController.text.trim(),
-                      'año': anioController.text.trim(),
+                      'marca': marca,
+                      'modelo': modelo,
+                      'año': anio,
                     });
                   });
                   Navigator.pop(context);
@@ -190,10 +216,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   void _cerrarSesion() async {
     await FirebaseAuth.instance.signOut();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('last_role_is_taller');
+    await prefs.remove('user_role');
+    
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const WelcomeRoleScreen()),
+        MaterialPageRoute(builder: (context) => const AuthScreen(isTaller: false)),
             (route) => false
     );
   }
@@ -240,6 +270,42 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         hintText: 'Tu nombre completo',
                         icon: Icons.badge_rounded,
                         colorScheme: colorScheme
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  _buildBentoBox(
+                    colorScheme: colorScheme,
+                    title: 'Ajustes Visuales',
+                    icon: Icons.palette_rounded,
+                    child: ValueListenableBuilder<ThemeMode>(
+                      valueListenable: themeNotifier,
+                      builder: (context, currentMode, _) {
+                        bool isDark = currentMode == ThemeMode.dark;
+                        return SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            isDark ? 'Modo Oscuro Activo' : 'Modo Claro Activo',
+                            style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14, color: colorScheme.onSurface),
+                          ),
+                          subtitle: Text(
+                            'Alterna el aspecto visual de toda la app.',
+                            style: GoogleFonts.poppins(fontSize: 12, color: colorScheme.onSurface.withOpacity(0.5)),
+                          ),
+                          value: isDark,
+                          activeColor: colorScheme.primary,
+                          onChanged: (bool value) async {
+                            final nuevoModo = value ? ThemeMode.dark : ThemeMode.light;
+                            themeNotifier.value = nuevoModo;
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setString('theme_mode', nuevoModo == ThemeMode.dark ? 'dark' : 'light');
+                          },
+                          secondary: Icon(
+                            isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                            color: isDark ? Colors.amber : colorScheme.primary,
+                          ),
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -341,23 +407,81 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
+  Future<void> _subirFotoPerfilConductor() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 60);
+      if (image == null) return;
+
+      setState(() => _isUploadingPhoto = true);
+
+      File file = File(image.path);
+      Reference ref = FirebaseStorage.instance.ref().child('usuarios/${_user!.uid}/perfil.jpg');
+
+      UploadTask uploadTask = ref.putFile(file);
+      TaskSnapshot snapshot = await uploadTask;
+      String downloadUrl = await snapshot.ref.getDownloadURL();
+
+      setState(() {
+        _photoUrl = downloadUrl;
+      });
+
+      await FirebaseFirestore.instance.collection('usuarios').doc(_user.uid).update({
+        'photoUrl': downloadUrl
+      });
+
+      _showSnackBar('¡Foto de perfil actualizada!', Colors.green);
+    } catch (e) {
+      _showSnackBar('Error al subir foto: $e', Colors.redAccent);
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
   Widget _buildHeroAvatar(ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2), width: 2),
-      ),
+    return GestureDetector(
+      onTap: _subirFotoPerfilConductor,
       child: Container(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: colorScheme.primary.withValues(alpha: 0.1),
+          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2), width: 2),
         ),
-        child: CircleAvatar(
-          radius: 50,
-          backgroundColor: colorScheme.primary,
-          child: const Icon(Icons.person_rounded, size: 50, color: Colors.white),
+        child: Stack(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colorScheme.primary.withValues(alpha: 0.1),
+              ),
+              child: CircleAvatar(
+                radius: 50,
+                backgroundColor: colorScheme.primary,
+                backgroundImage: (_photoUrl != null && _photoUrl!.isNotEmpty)
+                    ? NetworkImage(_photoUrl!)
+                    : null,
+                child: (_photoUrl == null || _photoUrl!.isEmpty)
+                    ? const Icon(Icons.person_rounded, size: 50, color: Colors.white)
+                    : null,
+              ),
+            ),
+            if (_isUploadingPhoto)
+              const Positioned.fill(
+                child: CircleAvatar(
+                  backgroundColor: Colors.black45,
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: colorScheme.primary,
+                child: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -3,14 +3,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart'; // NUEVO: Para guardar las fotos
-import 'package:image_picker/image_picker.dart'; // NUEVO: Para abrir la cámara/galería
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../auth/welcome_role_screen.dart';
+import '../auth/auth_screen.dart';
+import '../../main.dart';
 
 class TallerProfileScreen extends StatefulWidget {
   const TallerProfileScreen({super.key});
@@ -24,14 +25,13 @@ class _TallerProfileScreenState extends State<TallerProfileScreen> {
   final _nombreController = TextEditingController();
   final _telefonoController = TextEditingController();
 
-  // --- LÓGICA DEL MAPA ---
   LatLng? _ubicacionSeleccionada;
   final Completer<GoogleMapController> _mapController = Completer<GoogleMapController>();
 
-  // --- LÓGICA DE FOTOS ---
+  // --- MOTORES DE FOTOS ---
   final ImagePicker _picker = ImagePicker();
-  bool _isUploadingPhoto = false;
-
+  bool _isUploadingGaleria = false;
+  bool _isUploadingPerfil = false; // Nuevo estado para el avatar
   bool _isSaving = false;
 
   @override
@@ -41,46 +41,69 @@ class _TallerProfileScreenState extends State<TallerProfileScreen> {
     super.dispose();
   }
 
-  // --- FUNCIÓN PARA SUBIR FOTO ---
-  Future<void> _subirFotoFachada() async {
+  // 1. MOTOR: FOTO DE PERFIL PRINCIPAL
+  Future<void> _subirFotoPerfil() async {
     try {
-      // 1. Abrimos la galería
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 60);
       if (image == null) return;
 
-      setState(() => _isUploadingPhoto = true);
+      setState(() => _isUploadingPerfil = true);
 
-      // 2. Preparamos el archivo y la ruta en Firebase Storage
       File file = File(image.path);
-      String nombreArchivo = DateTime.now().millisecondsSinceEpoch.toString();
-      Reference ref = FirebaseStorage.instance.ref().child('talleres/$_uid/galeria/$nombreArchivo.jpg');
+      // Guardamos la foto siempre con el mismo nombre para que se sobreescriba y no gastar espacio
+      Reference ref = FirebaseStorage.instance.ref().child('talleres/$_uid/perfil.jpg');
 
-      // 3. Subimos la imagen
       UploadTask uploadTask = ref.putFile(file);
       TaskSnapshot snapshot = await uploadTask;
       String downloadUrl = await snapshot.ref.getDownloadURL();
 
-      // 4. Guardamos la URL en Firestore (Array)
+      // Guardamos el campo 'photoUrl' (string único)
+      await FirebaseFirestore.instance.collection('talleres').doc(_uid).update({
+        'photoUrl': downloadUrl
+      });
+
+      _showSnackBar('¡Foto de perfil actualizada!', Colors.green);
+    } catch (e) {
+      _showSnackBar('Error al subir perfil: $e', Colors.redAccent);
+    } finally {
+      if (mounted) setState(() => _isUploadingPerfil = false);
+    }
+  }
+
+  // 2. MOTOR: FOTOS DE LA GALERÍA (FACHADA)
+  Future<void> _subirFotoFachada() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      if (image == null) return;
+
+      setState(() => _isUploadingGaleria = true);
+
+      File file = File(image.path);
+      String nombreArchivo = DateTime.now().millisecondsSinceEpoch.toString();
+      Reference ref = FirebaseStorage.instance.ref().child('talleres/$_uid/galeria/$nombreArchivo.jpg');
+
+      UploadTask uploadTask = ref.putFile(file);
+      TaskSnapshot snapshot = await uploadTask;
+      String downloadUrl = await snapshot.ref.getDownloadURL();
+
+      // Guardamos en el Array 'fotos'
       await FirebaseFirestore.instance.collection('talleres').doc(_uid).update({
         'fotos': FieldValue.arrayUnion([downloadUrl])
       });
 
-      _showSnackBar('¡Foto subida con éxito!', Colors.green);
+      _showSnackBar('¡Foto añadida a la galería!', Colors.green);
     } catch (e) {
       _showSnackBar('Error al subir foto: $e', Colors.redAccent);
     } finally {
-      if (mounted) setState(() => _isUploadingPhoto = false);
+      if (mounted) setState(() => _isUploadingGaleria = false);
     }
   }
 
-  // --- FUNCIÓN PARA ELIMINAR FOTO ---
-  Future<void> _eliminarFoto(String urlFoto) async {
+  Future<void> _eliminarFotoGaleria(String urlFoto) async {
     try {
-      // Eliminamos la URL de Firestore
       await FirebaseFirestore.instance.collection('talleres').doc(_uid).update({
         'fotos': FieldValue.arrayRemove([urlFoto])
       });
-      // (Opcional: Se podría eliminar también de Storage usando refFromURL)
       _showSnackBar('Foto eliminada', Colors.orange);
     } catch (e) {
       _showSnackBar('Error al eliminar foto', Colors.redAccent);
@@ -89,6 +112,23 @@ class _TallerProfileScreenState extends State<TallerProfileScreen> {
 
   Future<void> _cambiarEstadoOperacion(bool estaAbierto) async {
     try {
+      if (estaAbierto) {
+        final doc = await FirebaseFirestore.instance.collection('talleres').doc(_uid).get();
+        if (doc.exists) {
+          final data = doc.data() as Map<String, dynamic>;
+          final String? photoUrl = data['photoUrl'];
+          final List<dynamic> fotos = data['fotos'] ?? [];
+
+          if (photoUrl == null || photoUrl.isEmpty || fotos.length < 3) {
+            _showSnackBar(
+              'Para abrir tu taller, debes subir tu foto de perfil y al menos 3 fotos de tu local.',
+              Colors.redAccent,
+            );
+            return;
+          }
+        }
+      }
+
       await FirebaseFirestore.instance.collection('talleres').doc(_uid).update({
         'estado': estaAbierto ? 'abierto' : 'cerrado',
       });
@@ -111,11 +151,25 @@ class _TallerProfileScreenState extends State<TallerProfileScreen> {
   }
 
   Future<void> _updateProfile() async {
+    final nombreLimpio = _nombreController.text.trim();
+    final telefonoLimpio = _telefonoController.text.trim();
+
+    if (nombreLimpio.isEmpty || nombreLimpio.length < 3) {
+      _showSnackBar('El nombre del taller debe tener al menos 3 caracteres', Colors.redAccent);
+      return;
+    }
+
+    final phoneRegExp = RegExp(r'^\+?[0-9\s\-]{7,15}$');
+    if (telefonoLimpio.isEmpty || !phoneRegExp.hasMatch(telefonoLimpio)) {
+      _showSnackBar('Ingresa un número de teléfono válido (solo números, mínimo 7 dígitos)', Colors.redAccent);
+      return;
+    }
+
     setState(() => _isSaving = true);
     try {
       Map<String, dynamic> datosAActualizar = {
-        'nombre': _nombreController.text.trim(),
-        'telefono': _telefonoController.text.trim(),
+        'nombre': nombreLimpio,
+        'telefono': telefonoLimpio,
       };
 
       if (_ubicacionSeleccionada != null) {
@@ -136,12 +190,12 @@ class _TallerProfileScreenState extends State<TallerProfileScreen> {
   Future<void> _cerrarSesionLimpiamente() async {
     await FirebaseAuth.instance.signOut();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user_role');
+    await prefs.remove('last_role_is_taller'); // Limpiamos la memoria
 
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => const WelcomeRoleScreen()),
+      MaterialPageRoute(builder: (context) => const AuthScreen(isTaller: false)),
           (route) => false,
     );
   }
@@ -167,7 +221,8 @@ class _TallerProfileScreenState extends State<TallerProfileScreen> {
 
           var data = snapshot.data?.data() as Map<String, dynamic>? ?? {};
           bool estaAbierto = data['estado'] == 'abierto';
-          List<dynamic> fotosGaleria = data['fotos'] ?? []; // Extraemos las fotos
+          List<dynamic> fotosGaleria = data['fotos'] ?? [];
+          String? fotoPerfilUrl = data['photoUrl']; // Extraemos la foto de perfil
 
           if (_nombreController.text.isEmpty) _nombreController.text = data['nombre'] ?? '';
           if (_telefonoController.text.isEmpty) _telefonoController.text = data['telefono'] ?? '';
@@ -182,7 +237,7 @@ class _TallerProfileScreenState extends State<TallerProfileScreen> {
             physics: const BouncingScrollPhysics(),
             child: Column(
               children: [
-                _buildProfileHeader(data['correo'] ?? 'taller@geocar.com', colorScheme),
+                _buildProfileHeader(data['correo'] ?? 'taller@geocar.com', fotoPerfilUrl, colorScheme),
                 const SizedBox(height: 32),
 
                 // --- 1. ESTADO DE OPERACIÓN ---
@@ -223,6 +278,44 @@ class _TallerProfileScreenState extends State<TallerProfileScreen> {
                 ),
                 const SizedBox(height: 24),
 
+                // --- 1.2 AJUSTES VISUALES ---
+                _buildSettingsSection(
+                  title: 'Ajustes Visuales',
+                  colorScheme: colorScheme,
+                  children: [
+                    ValueListenableBuilder<ThemeMode>(
+                      valueListenable: themeNotifier,
+                      builder: (context, currentMode, _) {
+                        bool isDark = currentMode == ThemeMode.dark;
+                        return SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            isDark ? 'Modo Oscuro Activo' : 'Modo Claro Activo',
+                            style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14, color: colorScheme.onSurface),
+                          ),
+                          subtitle: Text(
+                            'Alterna el aspecto visual de toda la app.',
+                            style: GoogleFonts.poppins(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.6)),
+                          ),
+                          value: isDark,
+                          activeColor: colorScheme.primary,
+                          onChanged: (bool value) async {
+                            final nuevoModo = value ? ThemeMode.dark : ThemeMode.light;
+                            themeNotifier.value = nuevoModo;
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setString('theme_mode', nuevoModo == ThemeMode.dark ? 'dark' : 'light');
+                          },
+                          secondary: Icon(
+                            isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                            color: isDark ? Colors.amber : colorScheme.primary,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
                 // --- 2. INFORMACIÓN GENERAL ---
                 _buildSettingsSection(
                   title: 'Información General',
@@ -240,7 +333,7 @@ class _TallerProfileScreenState extends State<TallerProfileScreen> {
                   title: 'Fotos del Local',
                   colorScheme: colorScheme,
                   children: [
-                    Text('Sube fotos de tu fachada para generar confianza.', style: GoogleFonts.poppins(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                    Text('Sube fotos de tu fachada o trabajos para generar confianza.', style: GoogleFonts.poppins(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.6))),
                     const SizedBox(height: 16),
 
                     SingleChildScrollView(
@@ -250,7 +343,7 @@ class _TallerProfileScreenState extends State<TallerProfileScreen> {
                         children: [
                           // BOTÓN DE AÑADIR FOTO
                           GestureDetector(
-                            onTap: _isUploadingPhoto ? null : _subirFotoFachada,
+                            onTap: _isUploadingGaleria ? null : _subirFotoFachada,
                             child: Container(
                               height: 120, width: 100,
                               margin: const EdgeInsets.only(right: 12),
@@ -259,7 +352,7 @@ class _TallerProfileScreenState extends State<TallerProfileScreen> {
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3), style: BorderStyle.solid, width: 2),
                               ),
-                              child: _isUploadingPhoto
+                              child: _isUploadingGaleria
                                   ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
                                   : Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -289,7 +382,7 @@ class _TallerProfileScreenState extends State<TallerProfileScreen> {
                               Positioned(
                                 top: 4, right: 16,
                                 child: GestureDetector(
-                                  onTap: () => _eliminarFoto(url),
+                                  onTap: () => _eliminarFotoGaleria(url),
                                   child: Container(
                                     padding: const EdgeInsets.all(4),
                                     decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
@@ -409,27 +502,38 @@ class _TallerProfileScreenState extends State<TallerProfileScreen> {
     );
   }
 
-  Widget _buildProfileHeader(String email, ColorScheme colorScheme) {
+  // HEADER DINÁMICO (Avatar clickeable para subir foto)
+  Widget _buildProfileHeader(String email, String? fotoUrl, ColorScheme colorScheme) {
     return Column(
       children: [
-        Stack(
-          alignment: Alignment.bottomRight,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2), width: 2)),
-              child: CircleAvatar(
-                radius: 50,
-                backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
-                child: Icon(Icons.build_rounded, size: 50, color: colorScheme.primary),
+        GestureDetector(
+          onTap: _isUploadingPerfil ? null : _subirFotoPerfil,
+          child: Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2), width: 2)),
+                child: _isUploadingPerfil
+                    ? CircleAvatar(
+                  radius: 50,
+                  backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                  child: CircularProgressIndicator(color: colorScheme.primary),
+                )
+                    : CircleAvatar(
+                  radius: 50,
+                  backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                  backgroundImage: fotoUrl != null ? NetworkImage(fotoUrl) : null,
+                  child: fotoUrl == null ? Icon(Icons.build_rounded, size: 50, color: colorScheme.primary) : null,
+                ),
               ),
-            ),
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: colorScheme.primary,
-              child: const Icon(Icons.camera_alt, size: 16, color: Colors.white),
-            ),
-          ],
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: colorScheme.primary,
+                child: const Icon(Icons.camera_alt, size: 16, color: Colors.white),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
         Text(email, style: GoogleFonts.poppins(color: colorScheme.onSurface.withValues(alpha: 0.5))),

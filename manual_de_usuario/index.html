@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual de Usuario - GeoCar</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Botón flotante para salir del modo de captura limpia -->
+  <button id="exitCleanBtn" class="exit-clean-btn" onclick="toggleCleanMode()">Salir de Modo Captura</button>
+
+  <div class="presentation-container" id="presentationContainer">
+    <div class="slide-deck">
+
+      <!-- DIAPOSITIVA 1: PORTADA -->
+      <div class="slide slide-portada active" data-slide="1" style="justify-content: center;">
+        <div class="portada-main" style="margin: 0;">
+          <div class="portada-logo" style="font-size: 64px; margin-bottom: 24px;">Geo<span>Car</span></div>
+          <div class="portada-title" style="font-size: 32px; max-width: 900px;">
+            MANUAL DE USUARIO DE LA APLICACIÓN MÓVIL GEOCAR:<br>
+            APLICACIÓN DE AUXILIO MECÁNICO Y GEOLOCALIZACIÓN DE TALLERES EN EL MUNICIPIO CABIMAS
+          </div>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 2: INTRODUCCIÓN -->
+      <div class="slide" data-slide="2">
+        <div class="slide-header">
+          <h2>Introducción a GeoCar</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body" style="align-items: center; justify-content: center;">
+          <div style="max-width: 800px; text-align: justify; line-height: 1.8; font-size: 14.5px;">
+            <p style="margin-bottom: 20px; font-size: 16px; font-weight: 500; color: var(--primary-color);">
+              ¿Qué es GeoCar?
+            </p>
+            <p style="margin-bottom: 20px; color: var(--text-light);">
+              <strong>GeoCar</strong> es una solución móvil diseñada específicamente para mitigar las incidencias viales en el municipio Cabimas, Zulia. Permite establecer un canal de comunicación directo y geolocalizado entre conductores que presentan fallas mecánicas en sus vehículos (requiriendo grúa, vulcanización o mecánica ligera) y los talleres de servicio disponibles en la zona.
+            </p>
+            <p style="margin-bottom: 20px; color: var(--text-light);">
+              El sistema opera de forma binaria a través de dos interfaces y roles diferenciados:
+            </p>
+            <div style="display: flex; gap: 20px; margin-top: 25px;">
+              <div style="flex: 1; padding: 20px; background-color: #f0fdf4; border-left: 4px solid var(--secondary-color); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+                <strong style="color: var(--secondary-color); display: block; margin-bottom: 8px; font-size: 15px;">🚗 Rol Conductor (Cliente)</strong>
+                Permite registrar vehículos, visualizar en un mapa interactivo los talleres abiertos cercanos, contactarlos por chat en tiempo real, solicitar rutas o emitir una alerta rápida de auxilio (SOS) con coordenadas precisas.
+              </div>
+              <div style="flex: 1; padding: 20px; background-color: #fffbeb; border-left: 4px solid var(--taller-color); border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+                <strong style="color: var(--taller-color); display: block; margin-bottom: 8px; font-size: 15px;">🛠️ Rol Taller (Mecánico)</strong>
+                Permite a los dueños de talleres registrar su negocio, configurar su ubicación exacta, su galería de fotos, activar/desactivar su disponibilidad, gestionar solicitudes de auxilio y recibir rutas guiadas al lugar de la falla.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 1</span>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 3: SECCIÓN 1 - INICIO DE LA APLICACIÓN -->
+      <div class="slide" data-slide="3">
+        <div class="slide-header">
+          <h2>Sección 1: Cómo Iniciar la Aplicación</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body">
+          <div class="slide-preview-panel">
+            <div class="phone-mockup">
+              <div class="phone-notch"></div>
+              <div class="phone-screen">
+                <img src="images/01_bienvenida.png" class="screenshot-img" alt="Pantalla de Bienvenida" onerror="handleImageError(this)">
+                <div class="fallback-ui">
+                  <div class="fallback-header">GeoCar</div>
+                  <div class="fallback-body" style="background: linear-gradient(135deg, #0d1b4b, #0f172a); color: white; justify-content: center; gap: 16px;">
+                    <div style="width:70px;height:70px;background:rgba(100,160,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;">
+                      <div style="width:45px;height:45px;background:#5b8ff9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;">📍</div>
+                    </div>
+                    <div style="font-size: 20px; font-weight: 800; letter-spacing: 3px; font-family: 'Space Grotesk', sans-serif;">GEOCAR</div>
+                    <p style="font-size: 9px; color: #5b8ff9; font-weight: 500;">Tu red mecánica en Cabimas</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="slide-explanation-panel">
+            <div class="section-intro">
+              Al abrir la aplicación, se presenta la pantalla de carga o <i>Splash Screen</i>. Muestra el logotipo de la aplicación — un ícono de localización sobre fondo azul oscuro — junto al nombre <strong>GEOCAR</strong> y el slogan <em>"Tu red mecánica en Cabimas"</em>. Esta pantalla se muestra brevemente mientras el sistema verifica si hay una sesión activa.
+            </div>
+            <div class="explanation-list">
+              <div class="explanation-item">
+                <div class="item-badge">1</div>
+                <div class="item-content">
+                  <div class="item-title">Logotipo e Identidad Visual</div>
+                  <div class="item-desc">El ícono de localización representa la función principal de la app: geolocalizar talleres mecánicos. El nombre GEOCAR y el slogan confirman el propósito de la aplicación al usuario.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">2</div>
+                <div class="item-content">
+                  <div class="item-title">Verificación de Sesión Automática</div>
+                  <div class="item-desc">Durante esta pantalla, el sistema verifica en segundo plano si el usuario ya tiene una sesión activa. Si la tiene, se redirige directamente a su panel principal sin necesidad de iniciar sesión nuevamente.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 2</span>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 4: SECCIÓN 2 - OPCIONES DE ACCESO -->
+      <div class="slide" data-slide="4">
+        <div class="slide-header">
+          <h2>Sección 2: Opciones de Acceso y Registro</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body">
+          <div class="slide-preview-panel">
+            <div class="phone-mockup">
+              <div class="phone-notch"></div>
+              <div class="phone-screen">
+                <img src="images/02_seleccion_metodo.png" class="screenshot-img" alt="Selección de Acceso" onerror="handleImageError(this)">
+                <div class="fallback-ui">
+                  <div class="fallback-header">GeoCar - Acceso</div>
+                  <div class="fallback-body">
+                    <div class="fallback-icon">🔐</div>
+                    <p style="font-weight: 600; margin-bottom: 20px;">Elige cómo ingresar</p>
+                    <div class="fallback-btn" style="background-color: var(--primary-color);">Iniciar con Correo</div>
+                    <div class="fallback-btn" style="background-color: #ffffff; color: #475569; border: 1px solid var(--border-color); margin-top: 8px;">Iniciar con Google</div>
+                    <p style="font-size: 8px; margin-top: 40px; color: var(--text-light);">¿No tienes cuenta? <span style="color: var(--primary-light); font-weight:600;">Crear cuenta</span></p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <div class="slide-explanation-panel">
+            <div class="section-intro">
+              Pantalla intermedia de bifurcación diseñada para ofrecer dos métodos de autenticación seguros y ágiles administrados por Firebase Auth.
+            </div>
+            <div class="explanation-list">
+              <div class="explanation-item">
+                <div class="item-badge">2</div>
+                <div class="item-content">
+                  <div class="item-title">Iniciar sesión con Correo</div>
+                  <div class="item-desc">Permite ingresar mediante el flujo tradicional de credenciales (correo electrónico y contraseña previamente registrados).</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">3</div>
+                <div class="item-content">
+                  <div class="item-title">Iniciar sesión con Google</div>
+                  <div class="item-desc">Utiliza el paquete nativo <i>google_sign_in</i> para autenticar de forma rápida y segura utilizando una cuenta de Google activa en el dispositivo.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">4</div>
+                <div class="item-content">
+                  <div class="item-title">Enlace 'Crear cuenta'</div>
+                  <div class="item-desc">Para usuarios nuevos, redirige al formulario de registro básico desde cero.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 3</span>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 5: SECCIÓN 3 - INICIO DE SESIÓN Y RECUPERACIÓN -->
+      <div class="slide" data-slide="5">
+        <div class="slide-header">
+          <h2>Sección 3: Inicio de Sesión y Recuperación</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body">
+          <div class="slide-preview-panel">
+            <div class="split-preview">
+              <div class="phone-mockup small">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                  <img src="images/03_login_correo.png" class="screenshot-img" alt="Login Correo" onerror="handleImageError(this)">
+                  <div class="fallback-ui">
+                    <div class="fallback-header">Empecemos</div>
+                    <div class="fallback-body" style="padding: 10px; gap: 8px;">
+                      <input type="text" placeholder="Correo electrónico" style="width: 100%; font-size: 8px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                      <input type="password" placeholder="Contraseña" style="width: 100%; font-size: 8px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                      <div class="fallback-btn" style="width: 100%; margin-top: 5px; background-color: var(--secondary-color);">Iniciar sesión</div>
+                      <p style="font-size: 7px; color: var(--primary-light); font-weight: 600; margin-top: 15px;">Olvidé mi contraseña</p>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+              <div class="phone-mockup small">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                  <img src="images/04_recuperacion_clave.png" class="screenshot-img" alt="Recuperación Clave" onerror="handleImageError(this)">
+                  <div class="fallback-ui">
+                    <div class="fallback-header">Recuperar Clave</div>
+                    <div class="fallback-body" style="padding: 10px; justify-content: center; background-color: rgba(0,0,0,0.05);">
+                      <div style="background-color: white; padding: 12px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%;">
+                        <p style="font-size: 8px; font-weight:600; margin-bottom: 8px;">Recuperar Contraseña</p>
+                        <input type="text" placeholder="Tu correo" style="width: 100%; font-size: 8px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px; margin-bottom: 8px;">
+                        <div style="display: flex; gap: 4px;">
+                          <div style="flex:1; background-color:#ef4444; color:white; font-size:7px; padding:4px; border-radius:4px; text-align:center;">Cancelar</div>
+                          <div style="flex:1; background-color:#10b981; color:white; font-size:7px; padding:4px; border-radius:4px; text-align:center;">Enviar</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <div class="slide-explanation-panel">
+            <div class="section-intro">
+              Interfaz dedicada a validar credenciales mediante formularios y recuperación de contraseña en caso de olvido, gestionado a través de Firebase.
+            </div>
+            <div class="explanation-list">
+              <div class="explanation-item">
+                <div class="item-badge">5</div>
+                <div class="item-content">
+                  <div class="item-title">Campos de Entrada de Datos</div>
+                  <div class="item-desc">Campos de correo y contraseña validados localmente para asegurar el formato correcto antes de enviar la consulta al backend.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">6</div>
+                <div class="item-content">
+                  <div class="item-title">Botón de Envío</div>
+                  <div class="item-desc">Dispara la función asíncrona de inicio de sesión. Si es exitosa, se consulta el rol en Cloud Firestore para redirigir al flujo correspondiente.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">7</div>
+                <div class="item-content">
+                  <div class="item-title">Acceso de Recuperación</div>
+                  <div class="item-desc">Enlace "Olvidé mi contraseña" que superpone una ventana modal sin perder el contexto visual del usuario.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">8</div>
+                <div class="item-content">
+                  <div class="item-title">Formulario de Recuperación</div>
+                  <div class="item-desc">El usuario ingresa su correo y presiona "Enviar". El sistema envía de forma automática un correo electrónico seguro con el enlace de redefinición de clave.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 4</span>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 6: SECCIÓN 4 - REGISTRO Y SELECCIÓN DE ROL -->
+      <div class="slide" data-slide="6">
+        <div class="slide-header">
+          <h2>Sección 4: Registro de Cuenta y Selección de Rol</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body">
+          <div class="slide-preview-panel">
+            <div class="split-preview">
+              <div class="phone-mockup small">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                  <img src="images/05_crear_cuenta.png" class="screenshot-img" alt="Crear Cuenta" onerror="handleImageError(this)">
+                  <div class="fallback-ui">
+                    <div class="fallback-header">Crear cuenta</div>
+                    <div class="fallback-body" style="padding: 10px; gap: 6px;">
+                      <input type="text" placeholder="Nombre completo" style="width: 100%; font-size: 7px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                      <input type="text" placeholder="Correo electrónico" style="width: 100%; font-size: 7px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                      <input type="password" placeholder="Contraseña (mín 8 car.)" style="width: 100%; font-size: 7px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                      <div class="fallback-btn" style="width: 100%; margin-top: 5px; background-color: var(--primary-color);">Únete</div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+              <div class="phone-mockup small">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                  <img src="images/06_seleccion_rol.png" class="screenshot-img" alt="Selección de Rol" onerror="handleImageError(this)">
+                  <div class="fallback-ui">
+                    <div class="fallback-header">Selecciona tu Rol</div>
+                    <div class="fallback-body" style="padding: 10px; justify-content: space-around;">
+                      <p style="font-size: 8px; font-weight:600;">¿Cómo usarás GeoCar?</p>
+                      <div style="background-color: #f0fdf4; border: 1px solid #bcf0da; padding: 10px; border-radius: 8px; width: 100%; text-align: left;">
+                        <span style="font-weight: 600; font-size: 9px; color: var(--secondary-color);">Necesito un Mecánico</span>
+                        <p style="font-size: 7px; color: var(--text-light);">Encuentra talleres cerca.</p>
+                      </div>
+                      <div style="background-color: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 8px; width: 100%; text-align: left;">
+                        <span style="font-weight: 600; font-size: 9px; color: var(--taller-color);">Soy un Taller</span>
+                        <p style="font-size: 7px; color: var(--text-light);">Registra tu negocio.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <div class="slide-explanation-panel">
+            <div class="section-intro">
+              Módulo que permite la incorporación de nuevos usuarios al sistema, seguido por la pantalla de selección de rol, que define la experiencia del usuario.
+            </div>
+            <div class="explanation-list">
+              <div class="explanation-item">
+                <div class="item-badge">9</div>
+                <div class="item-content">
+                  <div class="item-title">Formulario de Creación de Cuenta</div>
+                  <div class="item-desc">Solicita nombre, correo y contraseña. Al presionar "Únete", el sistema crea el registro en Firebase Auth y genera el documento inicial en Cloud Firestore.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">10</div>
+                <div class="item-content">
+                  <div class="item-title">Opción: Necesito un Mecánico (Conductor)</div>
+                  <div class="item-desc">Al hacer clic, inicializa el perfil con rol "conductor" y guarda la configuración en SharedPreferences para futuros arranques. Redirige al mapa de conductores.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">11</div>
+                <div class="item-content">
+                  <div class="item-title">Opción: Soy un Taller (Mecánico)</div>
+                  <div class="item-desc">Inicializa el perfil con rol "taller", creando un documento en la colección de talleres en la base de datos y redirigiendo al registro de local.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 5</span>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 7: ROL CONDUCTOR - CONFIGURACIÓN DE VEHÍCULOS -->
+      <div class="slide" data-slide="7">
+        <div class="slide-header">
+          <h2>Rol Conductor: Configuración del Perfil y Vehículo</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body">
+          <div class="slide-preview-panel">
+            <div class="phone-mockup">
+              <div class="phone-notch"></div>
+              <div class="phone-screen">
+                <img src="images/07_perfil_conductor.png" class="screenshot-img" alt="Perfil Conductor" onerror="handleImageError(this)">
+                <div class="fallback-ui">
+                  <div class="fallback-header">Mi Perfil</div>
+                  <div class="fallback-body" style="padding: 10px; gap: 8px;">
+                    <div style="width: 50px; height: 50px; background-color: #cbd5e1; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 20px;">👤</div>
+                    <p style="font-weight: 600; font-size: 11px; margin-bottom: 5px;">Configuración de Conductor</p>
+                    <div style="background-color: #f1f5f9; padding: 8px; border-radius: 8px; width: 100%; text-align: left; font-size: 8px;">
+                      <strong>Vehículos Registrados:</strong>
+                      <p style="color:#475569; margin-top:2px;">• Toyota Corolla (2012)</p>
+                    </div>
+                    <input type="text" placeholder="Marca (ej. Toyota)" style="width: 100%; font-size: 7px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                    <input type="text" placeholder="Modelo (ej. Corolla)" style="width: 100%; font-size: 7px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                    <input type="text" placeholder="Año (ej. 2012)" style="width: 100%; font-size: 7px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                    <div class="fallback-btn" style="width: 100%; background-color: var(--secondary-color);">Agregar Vehículo</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <div class="slide-explanation-panel">
+            <div class="section-intro">
+              Interfaz diseñada para la gestión de datos personales y registro de automóviles asociados al conductor, indispensable para formular solicitudes de auxilio vial.
+            </div>
+            <div class="explanation-list">
+              <div class="explanation-item">
+                <div class="item-badge">12</div>
+                <div class="item-content">
+                  <div class="item-title">Módulo de Vehículos Activos</div>
+                  <div class="item-desc">Muestra la lista de vehículos que el usuario ha registrado. Permite registrar más de un automóvil para mayor flexibilidad.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">13</div>
+                <div class="item-content">
+                  <div class="item-title">Campos del Nuevo Vehículo</div>
+                  <div class="item-desc">Formulario simple para ingresar los datos del automóvil (Marca, Modelo, Año). Esta información es enviada a Firestore.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">14</div>
+                <div class="item-content">
+                  <div class="item-title">Guardar Cambios</div>
+                  <div class="item-desc">Registra los datos en la base de datos de usuarios y limpia el formulario, actualizando de forma reactiva la lista superior.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 6</span>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 8: ROL CONDUCTOR - MAPA PRINCIPAL (CABIMAS) -->
+      <div class="slide" data-slide="8">
+        <div class="slide-header">
+          <h2>Rol Conductor: Pantalla Principal (Mapa)</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body">
+          <div class="slide-preview-panel">
+            <div class="phone-mockup">
+              <div class="phone-notch"></div>
+              <div class="phone-screen map-fallback-bg">
+                <img src="images/08_mapa_conductor.png" class="screenshot-img" alt="Mapa Conductor" onerror="handleImageError(this)">
+                <div class="fallback-ui" style="background: transparent;">
+                  <!-- Barra superior -->
+                  <div style="background-color: white; padding: 8px; display: flex; gap: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 100%; overflow-x: auto; padding-top: 14px;">
+                    <div style="background-color: var(--primary-color); color: white; padding: 2px 6px; border-radius: 10px; font-size: 7px; flex-shrink: 0;">Todos</div>
+                    <div style="background-color: #f1f5f9; padding: 2px 6px; border-radius: 10px; font-size: 7px; flex-shrink: 0;">Frenos</div>
+                    <div style="background-color: #f1f5f9; padding: 2px 6px; border-radius: 10px; font-size: 7px; flex-shrink: 0;">Mecánica Ligera</div>
+                  </div>
+                  <!-- Marcadores simulados -->
+                  <div class="map-marker taller-marker" style="top: 40%; left: 30%;"></div>
+                  <div class="map-marker taller-marker" style="top: 55%; left: 70%;"></div>
+                  <div class="map-marker" style="top: 60%; left: 45%; background-color: var(--secondary-color);"></div> <!-- Conductor -->
+                  <!-- Botón SOS -->
+                  <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background-color: var(--accent-color); color: white; width: 60px; height: 60px; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 800; font-size: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid white;">
+                    <span>SOS</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <div class="slide-explanation-panel">
+            <div class="section-intro">
+              La pantalla principal del conductor ofrece una visualización interactiva de Cabimas basada en Google Maps, mostrando la ubicación en tiempo real de los talleres.
+            </div>
+            <div class="explanation-list">
+              <div class="explanation-item">
+                <div class="item-badge">15</div>
+                <div class="item-content">
+                  <div class="item-title">Barra de Filtros por Especialidad</div>
+                  <div class="item-desc">Permite depurar los marcadores en el mapa de acuerdo con el servicio requerido (ej. Vulcanizadora, Frenos, Mecánica Ligera).</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">16</div>
+                <div class="item-content">
+                  <div class="item-title">Marcadores de Talleres</div>
+                  <div class="item-desc">Los pines en azul representan talleres abiertos en Cabimas. Al pulsarlos se despliega una tarjeta de información rápida que permite ir al detalle.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">17</div>
+                <div class="item-content">
+                  <div class="item-title">Botón de Auxilio Rápido (SOS)</div>
+                  <div class="item-desc">Botón flotante prominente. Al presionarse, dispara el flujo inmediato de emisión de una alerta por falla generalizada para talleres aledaños.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 7</span>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 9: ROL CONDUCTOR - DETALLE DEL TALLER -->
+      <div class="slide" data-slide="9">
+        <div class="slide-header">
+          <h2>Rol Conductor: Ficha Técnica del Taller</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body">
+          <div class="slide-preview-panel">
+            <div class="phone-mockup">
+              <div class="phone-notch"></div>
+              <div class="phone-screen">
+                <img src="images/09_detalle_taller.png" class="screenshot-img" alt="Detalle Taller" onerror="handleImageError(this)">
+                <div class="fallback-ui">
+                  <div style="height: 120px; background-color: #cbd5e1; display: flex; justify-content: center; align-items: center; font-size: 32px; color: #94a3b8; font-weight: bold;">🏢</div>
+                  <div class="fallback-body" style="padding: 10px; gap: 8px; justify-content: flex-start; text-align: left;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                      <span style="font-weight: 700; font-size: 13px;">Taller Autocentro</span>
+                      <span style="background-color: #dcfce7; color: #166534; font-size: 7px; padding: 2px 6px; border-radius: 10px; font-weight: bold;">ABIERTO</span>
+                    </div>
+                    <div style="font-size: 8px; color: var(--text-light);">⭐⭐⭐⭐⭐ (4.8 rating)</div>
+                    <div style="border-top: 1px solid #e2e8f0; width:100%; padding-top: 8px;">
+                      <p style="font-weight: 600; font-size: 8px;">Especialidades:</p>
+                      <p style="font-size: 7px; color: #64748b; margin-top:2px;">Tren Delantero, Vulcanizadora</p>
+                    </div>
+                    <div style="display: flex; gap: 4px; width: 100%; margin-top: auto;">
+                      <div class="fallback-btn" style="flex: 2; margin: 0; background-color: var(--primary-color);">CONTACTAR</div>
+                      <div class="fallback-btn" style="flex: 1; margin: 0; background-color: #f1f5f9; color: var(--primary-color); border: 1px solid var(--primary-light);">🧭</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <div class="slide-explanation-panel">
+            <div class="section-intro">
+              Al seleccionar un taller en el mapa, el sistema carga su ficha técnica con información detallada proveniente de Cloud Firestore y Firebase Storage.
+            </div>
+            <div class="explanation-list">
+              <div class="explanation-item">
+                <div class="item-badge">18</div>
+                <div class="item-content">
+                  <div class="item-title">Especialidades del Local</div>
+                  <div class="item-desc">Listado dinámico de servicios técnicos verificados que ofrece este taller en particular.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">19</div>
+                <div class="item-content">
+                  <div class="item-title">Botón 'Contactar' (Chat In-App)</div>
+                  <div class="item-desc">Despliega un panel de conversación directa en tiempo real entre el conductor y este taller para coordinar precios, repuestos o detalles técnicos.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">20</div>
+                <div class="item-content">
+                  <div class="item-title">Botón de Navegación</div>
+                  <div class="item-desc">Permite iniciar el trazado de ruta e ir al flujo de rescate mecánico con destino específico a la ubicación del local.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 8</span>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 10: ROL CONDUCTOR - AUXILIO EN PROCESO -->
+      <div class="slide" data-slide="10">
+        <div class="slide-header">
+          <h2>Rol Conductor: Auxilio Mecánico Activo</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body">
+          <div class="slide-preview-panel">
+            <div class="phone-mockup">
+              <div class="phone-notch"></div>
+              <div class="phone-screen map-fallback-bg">
+                <img src="images/10_sos_activo.png" class="screenshot-img" alt="SOS Activo" onerror="handleImageError(this)">
+                <div class="fallback-ui" style="background: transparent;">
+                  <!-- Simulación de ruta en el mapa -->
+                  <div style="position: absolute; top: 50%; left: 20%; width: 60%; height: 4px; background-color: var(--primary-light); transform: rotate(15deg);"></div>
+                  <div class="map-marker taller-marker" style="top: 45%; left: 20%;"></div>
+                  <div class="map-marker" style="top: 55%; left: 80%;"></div>
+                  <!-- Panel inferior flotante -->
+                  <div style="position: absolute; bottom: 0; left: 0; width: 100%; background-color: white; padding: 12px; border-radius: 20px 20px 0 0; box-shadow: 0 -4px 10px rgba(0,0,0,0.1); font-size: 8px;">
+                    <div style="font-weight: bold; font-size: 10px; color: var(--accent-color); margin-bottom: 4px;">🚨 Mecánico en camino</div>
+                    <p style="color: #64748b;">Mecánico: José Pérez (Taller Autocentro)</p>
+                    <p style="color: #64748b;">Auto: Toyota Corolla 2012</p>
+                    <div class="fallback-btn" style="width: 100%; margin: 6px 0 0 0; background-color: var(--primary-color);">ABRIR CHAT</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <div class="slide-explanation-panel">
+            <div class="section-intro">
+              Al confirmarse una solicitud de auxilio vial (ya sea SOS o ruta directa), la pantalla cambia al modo de rastreo del mecánico en camino.
+            </div>
+            <div class="explanation-list">
+              <div class="explanation-item">
+                <div class="item-badge">21</div>
+                <div class="item-content">
+                  <div class="item-title">Seguimiento por GPS</div>
+                  <div class="item-desc">Muestra la ruta calculada y la posición del mecánico moviéndose en tiempo real en el mapa conforme avanza hacia el conductor accidentado.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">22</div>
+                <div class="item-content">
+                  <div class="item-title">Ficha Técnica del Auxilio</div>
+                  <div class="item-desc">Despliega los datos del mecánico asignado, el nombre del taller y el vehículo afectado registrado para que el mecánico lo reconozca.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">23</div>
+                <div class="item-content">
+                  <div class="item-title">Canal de Chat Directo</div>
+                  <div class="item-desc">Botón que enlaza de inmediato con la sala de chat dedicada a este auxilio en curso para resolver dudas en el camino.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 9</span>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 11: ROL CONDUCTOR - CALIFICACIÓN -->
+      <div class="slide" data-slide="11">
+        <div class="slide-header">
+          <h2>Rol Conductor: Calificación del Servicio</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body">
+          <div class="slide-preview-panel">
+            <div class="phone-mockup">
+              <div class="phone-notch"></div>
+              <div class="phone-screen">
+                <img src="images/11_calificar_taller.png" class="screenshot-img" alt="Calificar Taller" onerror="handleImageError(this)">
+                <div class="fallback-ui" style="background-color: rgba(0,0,0,0.05); justify-content: center; padding: 15px;">
+                  <div style="background-color: white; padding: 15px; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); width: 100%; text-align: center;">
+                    <span style="font-size: 24px; display: block; margin-bottom: 8px;">⭐</span>
+                    <p style="font-weight: 700; font-size: 11px;">Califica el Servicio</p>
+                    <p style="font-size: 7px; color: #64748b; margin-top: 4px; margin-bottom: 12px;">¿Cómo calificarías tu experiencia con Taller Autocentro?</p>
+                    <div style="font-size: 18px; color: var(--taller-color); margin-bottom: 12px; letter-spacing: 2px;">⭐⭐⭐⭐⭐</div>
+                    <textarea placeholder="Deja tu reseña o comentario aquí..." style="width: 100%; font-size: 7px; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; height: 40px; margin-bottom: 10px; resize: none;"></textarea>
+                    <div class="fallback-btn" style="width: 100%; background-color: var(--secondary-color); margin: 0;">Guardar Calificación</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <div class="slide-explanation-panel">
+            <div class="section-intro">
+              Una vez que el taller marca el rescate como finalizado, el conductor recibe de forma reactiva un modal para calificar la asistencia mecánica recibida.
+            </div>
+            <div class="explanation-list">
+              <div class="explanation-item">
+                <div class="item-badge">24</div>
+                <div class="item-content">
+                  <div class="item-title">Selector de Estrellas</div>
+                  <div class="item-desc">Control táctil que permite asignar una puntuación de 1 a 5 estrellas al taller que completó el servicio.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">25</div>
+                <div class="item-content">
+                  <div class="item-title">Campo de Comentarios</div>
+                  <div class="item-desc">Área de texto libre opcional para describir la experiencia o el servicio brindado por el mecánico.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">26</div>
+                <div class="item-content">
+                  <div class="item-title">Botón 'Guardar Calificación'</div>
+                  <div class="item-desc">Envía la puntuación y el comentario a Firestore. El sistema recalcula la reputación media general del taller en tiempo real.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 10</span>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 12: ROL TALLER - REGISTRO DE NEGOCIO -->
+      <div class="slide" data-slide="12">
+        <div class="slide-header">
+          <h2>Rol Taller: Configuración Inicial del Local</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body">
+          <div class="slide-preview-panel">
+            <div class="phone-mockup">
+              <div class="phone-notch"></div>
+              <div class="phone-screen">
+                <img src="images/12_registro_taller.png" class="screenshot-img" alt="Registro Taller" onerror="handleImageError(this)">
+                <div class="fallback-ui">
+                  <div class="fallback-header">Configurar Taller</div>
+                  <div class="fallback-body" style="padding: 10px; gap: 6px; justify-content: flex-start; text-align: left; overflow-y: auto;">
+                    <p style="font-weight: 600; font-size: 8px;">Datos de tu Negocio:</p>
+                    <input type="text" placeholder="Nombre del Taller" style="width: 100%; font-size: 7px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                    <input type="text" placeholder="Teléfono de Contacto" style="width: 100%; font-size: 7px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                    <!-- Mapa miniatura -->
+                    <div style="height: 60px; background-color:#e2e8f0; border-radius:6px; display:flex; justify-content:center; align-items:center; font-size:8px; font-weight:600; color:#475569;">📍 Seleccionar ubicación GPS</div>
+                    <!-- Especialidades checklist -->
+                    <div>
+                      <p style="font-weight: 600; font-size: 7px; margin-bottom: 2px;">Especialidades:</p>
+                      <label style="font-size: 6px; display:block;"><input type="checkbox" checked> Mecánica Ligera</label>
+                      <label style="font-size: 6px; display:block;"><input type="checkbox"> Vulcanizadora (Cauchos)</label>
+                    </div>
+                    <!-- Fotos uploader -->
+                    <div style="display: flex; gap: 4px; margin-top: auto; justify-content: space-between; align-items: center;">
+                      <div style="font-size: 6px; color:var(--text-light);">Cargar Fotos (mín. 3)</div>
+                      <div style="background-color: #cbd5e1; padding: 4px 8px; border-radius: 4px; font-size: 6px; font-weight:600;">Subir</div>
+                    </div>
+                    <div class="fallback-btn" style="width: 100%; background-color: var(--taller-color); margin: 4px 0 0 0;">Completar Registro</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <div class="slide-explanation-panel">
+            <div class="section-intro">
+              Al elegir el rol de Taller, es obligatorio configurar los datos de la sucursal física. Esta pantalla recoge los parámetros necesarios para dar visibilidad al negocio.
+            </div>
+            <div class="explanation-list">
+              <div class="explanation-item">
+                <div class="item-badge">27</div>
+                <div class="item-content">
+                  <div class="item-title">Campos del Nombre y Teléfono</div>
+                  <div class="item-desc">Datos del establecimiento. El número telefónico servirá para contactar al taller en caso de rescates.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">28</div>
+                <div class="item-content">
+                  <div class="item-title">Selector de Ubicación GPS</div>
+                  <div class="item-desc">Mapa interactivo de Cabimas. El dueño debe pinchar el mapa para fijar de forma exacta la coordenada de su local físico.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">29</div>
+                <div class="item-content">
+                  <div class="item-title">Filtro de Especialidades</div>
+                  <div class="item-desc">Listado de casillas para marcar los servicios ofrecidos por el taller (ej. Electricidad, Frenos, Vulcanizadora).</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">30</div>
+                <div class="item-content">
+                  <div class="item-title">Gestión de Fotos del Negocio</div>
+                  <div class="item-desc">Subida obligatoria de la foto de perfil del taller y al menos 3 imágenes del establecimiento, resguardadas en Firebase Storage.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">31</div>
+                <div class="item-content">
+                  <div class="item-title">Botón 'Completar Registro'</div>
+                  <div class="item-desc">Valida y guarda la información en la base de datos de talleres, dando acceso al Dashboard del taller.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 11</span>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 13: ROL TALLER - DASHBOARD OPERATIVO -->
+      <div class="slide" data-slide="13">
+        <div class="slide-header">
+          <h2>Rol Taller: Panel de Control (Dashboard)</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body">
+          <div class="slide-preview-panel">
+            <div class="phone-mockup">
+              <div class="phone-notch"></div>
+              <div class="phone-screen">
+                <img src="images/13_dashboard_taller.png" class="screenshot-img" alt="Dashboard Taller" onerror="handleImageError(this)">
+                <div class="fallback-ui">
+                  <div class="fallback-header">Panel de Taller</div>
+                  <div class="fallback-body" style="padding: 10px; gap: 8px; justify-content: flex-start; text-align: left;">
+                    <div style="background-color: #eff6ff; padding: 10px; border-radius: 8px; width: 100%; display: flex; justify-content: space-between; align-items: center; border: 1px solid #bfdbfe;">
+                      <div>
+                        <span style="font-weight: 700; font-size: 10px; display:block;">Taller: ABIERTO</span>
+                        <span style="font-size: 6px; color:#4b5563;">Estás visible en el mapa</span>
+                      </div>
+                      <!-- Switch simulado -->
+                      <div style="width: 28px; height: 16px; background-color:#10b981; border-radius:10px; position:relative; cursor:pointer;">
+                        <div style="width: 12px; height: 12px; background-color:white; border-radius:50%; position:absolute; top:2px; right:2px;"></div>
+                      </div>
+                    </div>
+                    <!-- Bento cajas métricas -->
+                    <div style="display: flex; gap: 4px; width: 100%;">
+                      <div style="flex:1; background-color:#f1f5f9; padding:6px; border-radius:6px; text-align:center;">
+                        <span style="font-size: 11px; font-weight:700; display:block; color:var(--taller-color);">4.8 ★</span>
+                        <span style="font-size: 5px; color:#64748b;">Reputación</span>
+                      </div>
+                      <div style="flex:1; background-color:#f1f5f9; padding:6px; border-radius:6px; text-align:center;">
+                        <span style="font-size: 11px; font-weight:700; display:block; color:var(--primary-light);">12</span>
+                        <span style="font-size: 5px; color:#64748b;">Auxilios</span>
+                      </div>
+                    </div>
+                    <!-- Accesos rápidos -->
+                    <div style="display:flex; flex-direction:column; gap:4px; width:100%; margin-top: auto;">
+                      <div style="background-color:#f8fafc; border:1px solid #cbd5e1; padding:6px; border-radius:6px; font-size:7px; font-weight:600; cursor:pointer; display:flex; justify-content:space-between;">
+                        <span>Ver Historial de Reseñas</span> <span>❯</span>
+                      </div>
+                      <div style="background-color:#f8fafc; border:1px solid #cbd5e1; padding:6px; border-radius:6px; font-size:7px; font-weight:600; cursor:pointer; display:flex; justify-content:space-between;">
+                        <span>Bandeja de Entrada (Chats)</span> <span>❯</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <div class="slide-explanation-panel">
+            <div class="section-intro">
+              La central de control del taller permite monitorear las métricas de reputación del local y gestionar su disponibilidad de cara a los clientes.
+            </div>
+            <div class="explanation-list">
+              <div class="explanation-item">
+                <div class="item-badge">32</div>
+                <div class="item-content">
+                  <div class="item-title">Interruptor de Estado (Abierto/Cerrado)</div>
+                  <div class="item-desc">Activa o desactiva la visibilidad del local en el mapa de conductores. Si el taller está cerrado, los conductores no podrán enviarle auxilios ni ver su pin.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">33</div>
+                <div class="item-content">
+                  <div class="item-title">Indicadores de Rendimiento (Bento)</div>
+                  <div class="item-desc">Muestra la calificación media otorgada por conductores (estrellas) y el total de asistencias exitosas realizadas.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">34</div>
+                <div class="item-content">
+                  <div class="item-title">Accesos a Módulos Secundarios</div>
+                  <div class="item-desc">Botones de navegación rápida para ver reseñas de clientes, abrir la bandeja de chat en tiempo real o modificar la ficha del local.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 12</span>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 14: ROL TALLER - GESTIÓN DE RESCATES -->
+      <div class="slide" data-slide="14">
+        <div class="slide-header">
+          <h2>Rol Taller: Recepción y Navegación de Rescates</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body">
+          <div class="slide-preview-panel">
+            <div class="phone-mockup">
+              <div class="phone-notch"></div>
+              <div class="phone-screen map-fallback-bg">
+                <img src="images/14_rescate_taller.png" class="screenshot-img" alt="Rescate Taller" onerror="handleImageError(this)">
+                <div class="fallback-ui" style="background: transparent;">
+                  <!-- Simulación de ruta -->
+                  <div style="position: absolute; top: 40%; left: 30%; width: 50%; height: 4px; background-color: var(--primary-light); transform: rotate(-25deg);"></div>
+                  <div class="map-marker taller-marker" style="top: 35%; left: 78%;"></div>
+                  <div class="map-marker" style="top: 55%; left: 30%;"></div>
+                  <!-- Panel emergente SOS -->
+                  <div style="position: absolute; bottom: 0; left: 0; width: 100%; background-color: white; padding: 12px; border-radius: 20px 20px 0 0; box-shadow: 0 -4px 10px rgba(0,0,0,0.1); font-size: 8px;">
+                    <div style="font-weight: bold; font-size: 9px; color: var(--accent-color); margin-bottom: 2px;">🚨 ¡ALERTA SOS DETECTADA!</div>
+                    <p style="color:#475569; margin-bottom:4px;">Vehículo accidentado: Ford Fiesta 2008</p>
+                    <p style="color:#64748b; margin-bottom:6px;">Ubicación: Av. Intercomunal (2.1 km)</p>
+                    <div style="display: flex; gap: 4px;">
+                      <div class="fallback-btn" style="flex:1; margin:0; background-color:#ef4444;">Rechazar</div>
+                      <div class="fallback-btn" style="flex:1; margin:0; background-color:#10b981;">Aceptar Rescate</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <div class="slide-explanation-panel">
+            <div class="section-intro">
+              Cuando un conductor emite un auxilio, los talleres en el área reciben una alerta con la información de la falla y la ubicación para iniciar la asistencia.
+            </div>
+            <div class="explanation-list">
+              <div class="explanation-item">
+                <div class="item-badge">35</div>
+                <div class="item-content">
+                  <div class="item-title">Ubicación del Cliente en el Mapa</div>
+                  <div class="item-desc">Muestra el marcador del conductor en falla (rojo) y la posición del mecánico, indicando la ruta óptima de encuentro.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">36</div>
+                <div class="item-content">
+                  <div class="item-title">Información de la Emergencia</div>
+                  <div class="item-desc">Detalla el modelo de vehículo que presenta la avería y la distancia calculada para que el taller evalúe la factibilidad de asistencia.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">37</div>
+                <div class="item-content">
+                  <div class="item-title">Controles de Rescate</div>
+                  <div class="item-desc">Botones para Aceptar o Rechazar. Al aceptar, la base de datos cambia el estado a "en_camino" y el conductor recibe confirmación por voz.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 13</span>
+        </div>
+      </div>
+
+      <!-- DIAPOSITIVA 15: SOPORTE Y CHAT -->
+      <div class="slide" data-slide="15">
+        <div class="slide-header">
+          <h2>Módulo de Comunicación (Chat In-App) y Soporte</h2>
+          <div class="app-brand">Geo<span>Car</span></div>
+        </div>
+        <div class="slide-body">
+          <div class="slide-preview-panel">
+            <div class="phone-mockup">
+              <div class="phone-notch"></div>
+              <div class="phone-screen">
+                <img src="images/15_chat_inapp.png" class="screenshot-img" alt="Chat In-App" onerror="handleImageError(this)">
+                <div class="fallback-ui" style="flex-direction:column; background-color:#f1f5f9;">
+                  <div class="fallback-header">Chat: Taller Autocentro</div>
+                  <div class="fallback-body" style="padding: 10px; justify-content: flex-start; overflow-y: auto;">
+                    <div class="chat-bubble-simulation">Hola, buenas tardes. ¿Qué falla presenta su vehículo?</div>
+                    <div class="chat-bubble-simulation me">Buenas, se rompió la correa de los tiempos y estoy accidentado.</div>
+                    <div class="chat-bubble-simulation">Comprendido, ya voy saliendo en la grúa. Llego en 10 min.</div>
+                  </div>
+                  <!-- Entrada de texto -->
+                  <div style="background-color: white; padding: 6px; display: flex; gap: 4px; border-top: 1px solid #e2e8f0;">
+                    <input type="text" placeholder="Escribe un mensaje..." style="flex:1; font-size:7px; padding:4px; border:1px solid #cbd5e1; border-radius:10px;">
+                    <div style="background-color: var(--primary-color); color:white; width:16px; height:16px; border-radius:50%; display:flex; justify-content:center; align-items:center; font-size:7px; font-weight:bold;">❯</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <div class="slide-explanation-panel">
+            <div class="section-intro">
+              La mensajería instantánea interna asegura una comunicación coordinada y directa, protegiendo los datos privados del conductor y del taller.
+            </div>
+            <div class="explanation-list">
+              <div class="explanation-item">
+                <div class="item-badge">38</div>
+                <div class="item-content">
+                  <div class="item-title">Mensajes Recibidos</div>
+                  <div class="item-desc">Los mensajes enviados por la contraparte aparecen del lado izquierdo. Los mensajes se leen en tiempo real con <i>Streams</i> de Firestore.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">39</div>
+                <div class="item-content">
+                  <div class="item-title">Mensajes del Usuario</div>
+                  <div class="item-desc">Aparecen en el lado derecho. Cuentan con soporte para validación de entrega y marca de lectura automática.</div>
+                </div>
+              </div>
+              <div class="explanation-item">
+                <div class="item-badge">40</div>
+                <div class="item-content">
+                  <div class="item-title">Barra de Mensaje</div>
+                  <div class="item-desc">Permite redactar el texto y enviarlo presionando la flecha. La base de datos actualiza el documento instantáneamente para ambos participantes.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-footer">
+          <span>Manual de Usuario - GeoCar</span>
+          <span class="slide-number">ANEXO A - PÁG. 14</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CONTROLES DE LA PRESENTACIÓN -->
+    <div class="presentation-controls">
+      <div class="controls-left">
+        <button id="prevBtn" class="control-btn" onclick="prevSlide()">◀ Anterior</button>
+        <button id="nextBtn" class="control-btn primary" onclick="nextSlide()">Siguiente ▶</button>
+      </div>
+      <div class="controls-right">
+        <span id="slideCounter" class="slide-counter">Diapositiva 1 / 15</span>
+        <button id="themeToggleBtn" class="control-btn" onclick="toggleTheme()">🌙 Modo Oscuro</button>
+        <button class="control-btn" onclick="toggleCleanMode()">📷 Captura Limpia</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

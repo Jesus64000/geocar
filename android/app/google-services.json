@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "288138752009",
+    "project_id": "geocar-84047",
+    "storage_bucket": "geocar-84047.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:288138752009:android:072d5a3e8389ecd7f908d8",
+        "android_client_info": {
+          "package_name": "com.testingcode.geocar"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "288138752009-ttq6mv56hdu0vdd1a13fn699pm23ck6d.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.testingcode.geocar",
+            "certificate_hash": "e7ba159f3f4609d5bbc57ce8a413df6b261c2993"
+          }
+        },
+        {
+          "client_id": "288138752009-cemtu054b432rgcldjof42fh925qgejj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyApgQbbucyNaMVn6a1VFbxT7cNDp_MgXEk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "288138752009-cemtu054b432rgcldjof42fh925qgejj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

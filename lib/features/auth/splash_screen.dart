@@ -3,11 +3,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 import 'welcome_role_screen.dart';
+import 'auth_screen.dart';
 import '../taller_dashboard/taller_dashboard_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Para arreglar FirebaseFirestore
-import 'package:firebase_auth/firebase_auth.dart';      // Para el User? user
-import '../conductor_mapa/home_map_screen.dart';       // Para que reconozca HomeMapScreen
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../conductor_mapa/home_map_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -47,12 +47,34 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       final prefs = await SharedPreferences.getInstance();
       String? role = prefs.getString('user_role');
 
-      // Si por alguna razón el teléfono olvidó el rol, lo buscamos en la nube
+      // Si por alguna razón el teléfono olvidó el rol, lo buscamos en la nube de forma segura
       if (role == null) {
-        // Primero probamos si está en la colección de talleres
-        var tallerDoc = await FirebaseFirestore.instance.collection('talleres').doc(user.uid).get();
-        role = tallerDoc.exists ? 'taller' : 'conductor';
-        await prefs.setString('user_role', role);
+        try {
+          var tallerDoc = await FirebaseFirestore.instance.collection('talleres').doc(user.uid).get();
+          var usuarioDoc = await FirebaseFirestore.instance.collection('usuarios').doc(user.uid).get();
+          
+          if (tallerDoc.exists) {
+            role = 'taller';
+            await prefs.setString('user_role', 'taller');
+            await prefs.setBool('last_role_is_taller', true);
+          } else if (usuarioDoc.exists) {
+            role = 'conductor';
+            await prefs.setString('user_role', 'conductor');
+            await prefs.setBool('last_role_is_taller', false);
+          } else {
+            // Si está autenticado pero no tiene documento en ninguna, completó la autenticación pero NO la selección de rol
+            if (!mounted) return;
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => WelcomeRoleScreen(user: user)),
+            );
+            return;
+          }
+        } catch (e) {
+          // Si hay fallo de red o restricción de permisos, asumimos rol conductor por defecto
+          role = 'conductor';
+          await prefs.setString('user_role', role);
+        }
       }
 
       if (!mounted) return;
@@ -64,7 +86,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomeMapScreen()));
       }
     } else {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const WelcomeRoleScreen()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const AuthScreen(isTaller: false)));
     }
   }
 

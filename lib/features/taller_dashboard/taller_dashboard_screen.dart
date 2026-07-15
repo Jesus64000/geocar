@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:async';
+import '../../services/connectivity_service.dart';
 
 // Importaciones de pantallas (Rutas locales limpias)
 import 'taller_profile_screen.dart';
@@ -22,8 +24,75 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
   final String _uid = FirebaseAuth.instance.currentUser?.uid ?? '';
   bool _procesandoRescate = false; // Bloqueo de UI mientras transacciona
 
+  StreamSubscription<bool>? _connectivitySub;
+  bool _conectado = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _connectivitySub = ConnectivityService.instance.connectionStream.listen((conectado) {
+      if (mounted) {
+        setState(() {
+          _conectado = conectado;
+        });
+        if (!conectado) {
+          _showSnackBar("Sin conexión a Internet. GeoCar funcionará de forma limitada.", Colors.redAccent);
+        } else {
+          _showSnackBar("Conexión restablecida.", Colors.green);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySub?.cancel();
+    super.dispose();
+  }
+
+  void _showSnackBar(String text, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text, style: GoogleFonts.poppins()),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
+  }
+
   // Función para cambiar el estado de Abierto/Cerrado
   Future<void> _toggleEstado(bool actual) async {
+    if (!actual) {
+      // Intentando abrir el taller. Validamos fotos.
+      try {
+        final doc = await FirebaseFirestore.instance.collection('talleres').doc(_uid).get();
+        if (doc.exists) {
+          final data = doc.data() as Map<String, dynamic>;
+          final String? photoUrl = data['photoUrl'];
+          final List<dynamic> fotos = data['fotos'] ?? [];
+
+          if (photoUrl == null || photoUrl.isEmpty || fotos.length < 3) {
+            _showSnackBar(
+              'Para abrir tu taller, debes subir tu foto de perfil y al menos 3 fotos de tu local.',
+              Colors.redAccent,
+            );
+            if (mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TallerProfileScreen()),
+              );
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        _showSnackBar('Error al validar fotos: $e', Colors.redAccent);
+        return;
+      }
+    }
+
     await FirebaseFirestore.instance.collection('talleres').doc(_uid).update({
       'estado': actual ? 'cerrado' : 'abierto',
     });
@@ -94,9 +163,11 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
           // --- ANALYTICS EN VIVO ---
           int visitas = data['visitas'] ?? 0; // Extrae visitas reales, si no hay, es 0
 
-          return CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
+          return Stack(
+            children: [
+              CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
               // 1. HEADER (SALUDO Y PERFIL)
               SliverAppBar(
                 expandedHeight: 100,
@@ -124,7 +195,8 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
                         child: CircleAvatar(
                           radius: 20,
                           backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
-                          child: Icon(Icons.person_rounded, color: colorScheme.primary),
+                          backgroundImage: data['photoUrl'] != null ? NetworkImage(data['photoUrl']) : null,
+                          child: data['photoUrl'] == null ? Icon(Icons.person_rounded, color: colorScheme.primary) : null,
                         ),
                       ),
                     ],
@@ -254,18 +326,32 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
                       const SizedBox(height: 16),
 
                       // 5. ACCESOS RÁPIDOS
+                      // 5. ACCESOS RÁPIDOS
                       _buildBentoContainer(
                         color: colorScheme.surface,
                         border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _buildQuickAction(
-                                context,
-                                icon: Icons.forum_rounded,
-                                label: "Mensajes",
-                                color: Colors.green,
-                                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ChatInboxScreen(miRol: 'taller')))
+                            // --- MOTOR DE NOTIFICACIONES DEL TALLER ---
+                            StreamBuilder<QuerySnapshot>(
+                                stream: FirebaseFirestore.instance
+                                    .collection('chats_directos')
+                                    .where('taller_id', isEqualTo: _uid)
+                                    .where('leido_por_taller', isEqualTo: false) // Solo cuenta los no leídos
+                                    .snapshots(),
+                                builder: (context, snapshot) {
+                                  bool tieneMensajesNuevos = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
+
+                                  return _buildQuickAction(
+                                      context,
+                                      icon: Icons.forum_rounded,
+                                      label: "Mensajes",
+                                      color: Colors.green,
+                                      showBadge: tieneMensajesNuevos, // Enciende el punto rojo si hay mensajes
+                                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ChatInboxScreen(miRol: 'taller')))
+                                  );
+                                }
                             ),
                             _buildQuickAction(
                                 context,
@@ -289,6 +375,33 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
                   ),
                 ),
               ),
+                ],
+              ),
+              if (!_conectado)
+                Positioned(
+                  top: 50,
+                  left: 20,
+                  right: 20,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      color: Colors.redAccent.withValues(alpha: 0.95),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              "Sin conexión a Internet. Funciones limitadas.",
+                              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
             ],
           );
         },
@@ -314,19 +427,24 @@ class _TallerDashboardScreenState extends State<TallerDashboardScreen> {
     );
   }
 
-  Widget _buildQuickAction(BuildContext context, {required IconData icon, required String label, required Color color, VoidCallback? onTap}) {
+  Widget _buildQuickAction(BuildContext context, {required IconData icon, required String label, required Color color, VoidCallback? onTap, bool showBadge = false}) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+          Badge(
+            isLabelVisible: showBadge,
+            backgroundColor: Colors.redAccent,
+            smallSize: 12, // Tamaño del puntito rojo
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 28),
             ),
-            child: Icon(icon, color: color, size: 28),
           ),
           const SizedBox(height: 8),
           Text(label, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface)),

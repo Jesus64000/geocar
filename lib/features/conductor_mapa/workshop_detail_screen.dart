@@ -40,7 +40,9 @@ class WorkshopDetailScreen extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
             ),
             flexibleSpace: FlexibleSpaceBar(
-              background: fotos.isNotEmpty
+              background: (data['photoUrl'] != null && (data['photoUrl'] as String).isNotEmpty)
+                  ? Image.network(data['photoUrl'], fit: BoxFit.cover)
+                  : fotos.isNotEmpty
                   ? Image.network(fotos.first, fit: BoxFit.cover)
                   : Container(
                 color: colorScheme.primary.withValues(alpha: 0.1),

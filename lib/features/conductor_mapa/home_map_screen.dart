@@ -6,8 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'workshop_list_screen.dart';
 import 'user_profile_screen.dart';
@@ -17,7 +15,9 @@ import '../../models/chat_inbox_screen.dart';
 
 import '../../features/taller_dashboard/taller_rescue_screen.dart';
 import 'package:geocar/widgets/chat/universal_chat_sheet.dart';
-
+import '../../services/voice_service.dart';
+import '../../widgets/shimmer_loading.dart';
+import '../../services/connectivity_service.dart';
 
 class HomeMapScreen extends StatefulWidget {
   const HomeMapScreen({super.key});
@@ -33,10 +33,27 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
   bool _estaCargandoMapa = true;
   StreamSubscription<Position>? _positionStream;
 
+  // --- CACHE DE STREAMS DE FIRESTORE ---
+  Stream<QuerySnapshot>? _chatsDirectosStream;
+  Stream<DocumentSnapshot>? _usuarioPerfilStream;
+  String? _cachedUserId;
+
+  void _inicializarStreams(String uid) {
+    if (_cachedUserId == uid) return;
+    _cachedUserId = uid;
+    _chatsDirectosStream = FirebaseFirestore.instance
+        .collection('chats_directos')
+        .where('conductor_id', isEqualTo: uid)
+        .where('leido_por_conductor', isEqualTo: false)
+        .snapshots();
+    _usuarioPerfilStream = FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(uid)
+        .snapshots();
+  }
+
   // --- LÓGICA DE RUTAS INTERNAS ---
   final Set<Polyline> _polylines = {};
-  // TODO: Mover a variables de entorno en producción
-  final String _googleApiKey = "AIzaSyC_mRW28URYlaVSO6qcGgtedGf7bQKi7Dc";
   // --------------------------------
 
   // --- FILTRO DE CATEGORÍAS ---
@@ -46,16 +63,31 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
     'Electricidad', 'Aire Acondicionado', 'Vulcanizadora (Cauchos)'
   ];
   // ---------------------------
+  StreamSubscription<bool>? _connectivitySub;
+  bool _conectado = true;
 
   @override
   void initState() {
     super.initState();
     _iniciarRastreoGPS();
+    _connectivitySub = ConnectivityService.instance.connectionStream.listen((conectado) {
+      if (mounted) {
+        setState(() {
+          _conectado = conectado;
+        });
+        if (!conectado) {
+          _showSnackBar("Sin conexión a Internet. GeoCar funcionará de forma limitada.", Colors.redAccent);
+        } else {
+          _showSnackBar("Conexión restablecida.", Colors.green);
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
     _positionStream?.cancel();
+    _connectivitySub?.cancel();
     super.dispose();
   }
 
@@ -116,7 +148,6 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
   // MOTOR SOS REFACTORIZADO (SPRINT 18: LÓGICA DE GARAGE)
   // =========================================================================
 
-  // 1. Verificador del Garage
   Future<void> _lanzarSOS() async {
     if (_miPosicionActual == null) {
       _showSnackBar("Esperando señal GPS para ubicarte...", Colors.orange);
@@ -137,20 +168,16 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
         }
       }
 
-      // CASO A: No tiene vehículos
       if (vehiculos.isEmpty) {
         _showSnackBar("Por favor, registra un vehículo en tu Perfil antes de pedir auxilio.", Colors.orange);
-        return; // Rompemos el flujo, no lo dejamos pedir SOS vacío
+        return;
       }
 
-      // CASO B: Tiene 1 solo vehículo
       if (vehiculos.length == 1) {
         var v = vehiculos[0];
         String vehiculoStr = "${v['marca']} ${v['modelo']} (${v['año']})";
         await _ejecutarSOS(user.uid, vehiculoStr);
-      }
-      // CASO C: Tiene Múltiples vehículos (Abre el selector)
-      else {
+      } else {
         _mostrarSelectorVehiculoSOS(user.uid, vehiculos);
       }
 
@@ -159,7 +186,6 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
     }
   }
 
-  // 2. Selector de UI
   void _mostrarSelectorVehiculoSOS(String uid, List<dynamic> vehiculos) {
     showModalBottomSheet(
       context: context,
@@ -200,8 +226,8 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                   title: Text(vehiculoStr, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14)),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                   onTap: () {
-                    Navigator.pop(context); // Cierra modal
-                    _ejecutarSOS(uid, vehiculoStr); // Dispara el cohete
+                    Navigator.pop(context);
+                    _ejecutarSOS(uid, vehiculoStr);
                   },
                 ),
               );
@@ -213,9 +239,9 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
     );
   }
 
-  // 3. El Motor de Disparo
   Future<void> _ejecutarSOS(String uid, String vehiculoAfectado) async {
     _showSnackBar("Enviando alerta a los talleres cercanos...", Colors.orange);
+    VoiceService().speak("Solicitud de rescate enviada. Buscando talleres cercanos.");
     try {
       DocumentReference docRef = await FirebaseFirestore.instance.collection('emergencias').add({
         'conductor_id': uid,
@@ -237,77 +263,8 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
       _showSnackBar("Error al enviar SOS: $e", Colors.redAccent);
     }
   }
-  // =========================================================================
 
 
-  Future<void> _dibujarRutaEnMapa(GeoPoint destino) async {
-    if (_miPosicionActual == null) {
-      _showSnackBar("Esperando tu ubicación GPS...", Colors.orange);
-      return;
-    }
-
-    PolylinePoints polylinePoints = PolylinePoints(apiKey: _googleApiKey);
-
-    try {
-      RoutesApiResponse response = await polylinePoints.getRouteBetweenCoordinatesV2(
-        request: RoutesApiRequest(
-          origin: PointLatLng(_miPosicionActual!.latitude, _miPosicionActual!.longitude),
-          destination: PointLatLng(destino.latitude, destino.longitude),
-          travelMode: TravelMode.driving,
-        ),
-      );
-
-      PolylineResult result = polylinePoints.convertToLegacyResult(response);
-
-      if (result.points.isNotEmpty) {
-        List<LatLng> pLineCoordinates = [];
-        for (var point in result.points) {
-          pLineCoordinates.add(LatLng(point.latitude, point.longitude));
-        }
-
-        setState(() {
-          _polylines.clear();
-          _polylines.add(
-            Polyline(
-              polylineId: const PolylineId('ruta_activa'),
-              color: Theme.of(context).colorScheme.primary,
-              points: pLineCoordinates,
-              width: 5,
-              jointType: JointType.round,
-            ),
-          );
-        });
-
-        _ajustarCamaraARuta(LatLng(destino.latitude, destino.longitude));
-
-      } else {
-        _showSnackBar("No se pudo trazar la ruta. Verifica tu API Key.", Colors.redAccent);
-      }
-    } catch (e) {
-      _showSnackBar("Error al generar ruta: $e", Colors.redAccent);
-    }
-  }
-
-  Future<void> _ajustarCamaraARuta(LatLng destino) async {
-    if (_miPosicionActual == null) return;
-    LatLngBounds bounds;
-    if (_miPosicionActual!.latitude > destino.latitude && _miPosicionActual!.longitude > destino.longitude) {
-      bounds = LatLngBounds(southwest: destino, northeast: _miPosicionActual!);
-    } else if (_miPosicionActual!.longitude > destino.longitude) {
-      bounds = LatLngBounds(
-          southwest: LatLng(_miPosicionActual!.latitude, destino.longitude),
-          northeast: LatLng(destino.latitude, _miPosicionActual!.longitude));
-    } else if (_miPosicionActual!.latitude > destino.latitude) {
-      bounds = LatLngBounds(
-          southwest: LatLng(destino.latitude, _miPosicionActual!.longitude),
-          northeast: LatLng(_miPosicionActual!.latitude, destino.longitude));
-    } else {
-      bounds = LatLngBounds(southwest: _miPosicionActual!, northeast: destino);
-    }
-
-    final GoogleMapController controller = await _mapController.future;
-    controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
-  }
 
   static const LatLng _centerCabimas = LatLng(10.3927, -71.4405);
 
@@ -315,6 +272,26 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
 [
   { "featureType": "poi", "elementType": "labels", "stylers": [ { "visibility": "off" } ] },
   { "featureType": "transit", "elementType": "labels", "stylers": [ { "visibility": "off" } ] }
+]
+''';
+
+  final String _mapStyleOscuro = '''
+[
+  { "elementType": "geometry", "stylers": [ { "color": "#242f3e" } ] },
+  { "elementType": "labels.text.fill", "stylers": [ { "color": "#746855" } ] },
+  { "elementType": "labels.text.stroke", "stylers": [ { "color": "#242f3e" } ] },
+  { "featureType": "administrative.locality", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] },
+  { "featureType": "poi", "elementType": "labels", "stylers": [ { "visibility": "off" } ] },
+  { "featureType": "road", "elementType": "geometry", "stylers": [ { "color": "#38414e" } ] },
+  { "featureType": "road", "elementType": "geometry.stroke", "stylers": [ { "color": "#212a37" } ] },
+  { "featureType": "road", "elementType": "labels.text.fill", "stylers": [ { "color": "#9ca5b3" } ] },
+  { "featureType": "road.highway", "elementType": "geometry", "stylers": [ { "color": "#746855" } ] },
+  { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [ { "color": "#1f2835" } ] },
+  { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [ { "color": "#f3d19c" } ] },
+  { "featureType": "transit", "elementType": "labels", "stylers": [ { "visibility": "off" } ] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#17263c" } ] },
+  { "featureType": "water", "elementType": "labels.text.fill", "stylers": [ { "color": "#515c6d" } ] },
+  { "featureType": "water", "elementType": "labels.text.stroke", "stylers": [ { "color": "#17263c" } ] }
 ]
 ''';
 
@@ -329,7 +306,6 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
         estaAbierto ? BitmapDescriptor.hueAzure : BitmapDescriptor.hueRed,
       ),
       onTap: () {
-        // --- MOTOR DE ANALÍTICAS ---
         FirebaseFirestore.instance.collection('talleres').doc(id).update({
           'visitas': FieldValue.increment(1)
         }).catchError((e) => debugPrint("Error actualizando visitas: $e"));
@@ -349,141 +325,267 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
     );
   }
 
+  void _verImagenGrande(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                width: double.infinity,
+                height: double.infinity,
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black45,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _mostrarDetalleTaller(BuildContext context, String tallerId, String nombre, String especialidades, String distancia, bool abierto, ColorScheme colorScheme, GeoPoint posicionTaller, String? telefono) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 20, offset: Offset(0, -5))],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-                child: Container(
-                    width: 50, height: 5,
-                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10))
-                )
-            ),
-            const SizedBox(height: 24),
+      builder: (context) => StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance.collection('talleres').doc(tallerId).snapshots(),
+          builder: (context, snapshot) {
+            // Extraemos los datos en tiempo real para ver las fotos
+            var data = snapshot.data?.data() as Map<String, dynamic>? ?? {};
+            String? photoUrl = data['photoUrl'];
+            List<dynamic> galeria = data['fotos'] ?? [];
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
+            return Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 20, offset: Offset(0, -5))],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                      child: Container(
+                          width: 50, height: 5,
+                          decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10))
+                      )
+                  ),
+                  const SizedBox(height: 24),
+
+                  // GALERÍA DE FOTOS ESTILO GOOGLE MAPS (AL COMIENZO DE LA FICHA)
+                  if (galeria.isNotEmpty) ...[
+                    SizedBox(
+                      height: 140,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: galeria.length,
+                        itemBuilder: (context, index) {
+                          final imageUrl = galeria[index];
+                          return GestureDetector(
+                            onTap: () => _verImagenGrande(context, imageUrl),
+                            child: Container(
+                              width: 220,
+                              margin: const EdgeInsets.only(right: 12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  )
+                                ],
+                                image: DecorationImage(
+                                  image: NetworkImage(imageUrl),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ] else if (photoUrl != null && photoUrl.isNotEmpty) ...[
+                    GestureDetector(
+                      onTap: () => _verImagenGrande(context, photoUrl),
+                      child: Container(
+                        height: 140,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            )
+                          ],
+                          image: DecorationImage(
+                            image: NetworkImage(photoUrl),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+
+                  // CABECERA CON FOTO DEL TALLER
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(nombre, style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, height: 1.2)),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.location_on, size: 16, color: abierto ? Colors.green : Colors.grey),
-                          const SizedBox(width: 4),
-                          Text('Cabimas, Zulia', style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 13)),
-                        ],
-                      )
+                      Expanded(
+                        child: Row(
+                          children: [
+                            // AQUI VA LA FOTO DE PERFIL DEL TALLER
+                            CircleAvatar(
+                              radius: 30,
+                              backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                              backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                              child: photoUrl == null ? Icon(Icons.build_circle_rounded, size: 30, color: colorScheme.primary) : null,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(nombre, style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, height: 1.2), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.location_on, size: 14, color: abierto ? Colors.green : Colors.grey),
+                                      const SizedBox(width: 4),
+                                      Text('Cabimas, Zulia', style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 12)),
+                                    ],
+                                  )
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: abierto ? Colors.green.shade50 : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: abierto ? Colors.green.shade300 : Colors.red.shade300),
+                        ),
+                        child: Text(abierto ? 'ABIERTO' : 'CERRADO', style: GoogleFonts.poppins(color: abierto ? Colors.green.shade700 : Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: 10)),
+                      ),
                     ],
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: abierto ? Colors.green.shade50 : Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: abierto ? Colors.green.shade300 : Colors.red.shade300),
+                  const SizedBox(height: 20),
+
+                  // MÉTRICAS
+                  Row(
+                    children: [
+                      _buildMiniBento(Icons.star_rounded, 'Nuevo', 'Rating', Colors.amber, colorScheme),
+                      const SizedBox(width: 12),
+                      _buildMiniBento(Icons.location_on_outlined, distancia, 'Distancia', colorScheme.primary, colorScheme),
+                      const SizedBox(width: 12),
+                      _buildMiniBento(Icons.verified_user_outlined, 'Sí', 'Verificado', Colors.blue, colorScheme),
+                    ],
                   ),
-                  child: Text(abierto ? 'ABIERTO' : 'CERRADO', style: GoogleFonts.poppins(color: abierto ? Colors.green.shade700 : Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: 12)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
-            Row(
-              children: [
-                _buildMiniBento(Icons.star_rounded, 'Nuevo', 'Rating', Colors.amber, colorScheme),
-                const SizedBox(width: 12),
-                _buildMiniBento(Icons.location_on_outlined, distancia, 'Distancia', colorScheme.primary, colorScheme),
-                const SizedBox(width: 12),
-                _buildMiniBento(Icons.verified_user_outlined, 'Sí', 'Verificado', Colors.blue, colorScheme),
-              ],
-            ),
-            const SizedBox(height: 24),
+                  Text(especialidades, style: GoogleFonts.poppins(fontSize: 14, color: colorScheme.onSurface.withValues(alpha: 0.7))),
+                  const SizedBox(height: 24),
 
-            Text(especialidades, style: GoogleFonts.poppins(fontSize: 14, color: colorScheme.onSurface.withValues(alpha: 0.7))),
-            const SizedBox(height: 32),
+                  const SizedBox(height: 16),
 
-            Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TallerRescueScreen(
-                            emergenciaId: "DIRECTORIO",
-                            destinoManual: LatLng(posicionTaller.latitude, posicionTaller.longitude),
-                            nombreDestino: nombre,
+                  // BOTONES DE ACCIÓN (Mantenemos tu lógica intacta)
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => TallerRescueScreen(
+                                  emergenciaId: "DIRECTORIO",
+                                  destinoManual: LatLng(posicionTaller.latitude, posicionTaller.longitude),
+                                  nombreDestino: nombre,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.directions_car_rounded),
+                          label: Text('IR AL TALLER', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: colorScheme.surface,
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                           ),
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.directions_car_rounded),
-                    label: Text('IR AL TALLER', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.primary,
-                      foregroundColor: colorScheme.surface,
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 1,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      final String miUid = FirebaseAuth.instance.currentUser?.uid ?? 'anonimo';
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (context) => Padding(
-                          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-                          child: UniversalChatSheet(
-                            modo: ChatMode.directo,
-                            referenceId: '${tallerId}_$miUid',
-                            tallerPhone: telefono ?? '',
-                            miRol: 'conductor',
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 1,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            final String miUid = FirebaseAuth.instance.currentUser?.uid ?? 'anonimo';
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) => Padding(
+                                padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+                                child: UniversalChatSheet(
+                                  modo: ChatMode.directo,
+                                  referenceId: '${tallerId}_$miUid',
+                                  tallerPhone: telefono ?? '',
+                                  miRol: 'conductor',
+                                ),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: colorScheme.onPrimary,
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                           ),
+                          child: const Icon(Icons.chat_bubble_rounded, size: 28),
                         ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.primary,
-                      foregroundColor: colorScheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                    ),
-                    child: const Icon(Icons.chat_bubble_rounded, size: 28),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            );
+          }
       ),
     );
   }
@@ -529,20 +631,87 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
     );
   }
 
+  Widget _buildMapShimmer(BuildContext context, ColorScheme colorScheme) {
+    return Container(
+      color: colorScheme.surface,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.05,
+              child: GridPaper(
+                color: colorScheme.onSurface,
+                divisions: 2,
+                subdivisions: 1,
+              ),
+            ),
+          ),
+          Positioned(
+            top: 60,
+            left: 20,
+            right: 20,
+            child: ShimmerLoading.rounded(
+              width: MediaQuery.of(context).size.width - 40,
+              height: 55,
+              borderRadius: 24,
+            ),
+          ),
+          Positioned(
+            top: 135,
+            left: 20,
+            right: 0,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              child: Row(
+                children: List.generate(4, (index) => Container(
+                  margin: const EdgeInsets.only(right: 12),
+                  child: ShimmerLoading.rounded(
+                    width: 100,
+                    height: 38,
+                    borderRadius: 16,
+                  ),
+                )),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 20,
+            bottom: 220,
+            child: Column(
+              children: [
+                const ShimmerLoading.circular(width: 50, height: 50),
+                const SizedBox(height: 16),
+                const ShimmerLoading.circular(width: 50, height: 50),
+              ],
+            ),
+          ),
+          Positioned(
+            bottom: 30,
+            left: 20,
+            right: 20,
+            child: ShimmerLoading.rounded(
+              width: MediaQuery.of(context).size.width - 40,
+              height: 90,
+              borderRadius: 24,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final currentUserUid = FirebaseAuth.instance.currentUser?.uid; // Declaración de variable para el UID
+    if (currentUserUid != null) {
+      _inicializarStreams(currentUserUid);
+    }
 
     return Scaffold(
       body: _estaCargandoMapa
-          ? Center(child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 16),
-          Text("Sincronizando satélites...", style: GoogleFonts.poppins())
-        ],
-      ))
+          ? _buildMapShimmer(context, colorScheme)
           : Stack(
         children: [
           StreamBuilder<QuerySnapshot>(
@@ -568,8 +737,9 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                 }
               }
 
+              final bool isDark = colorScheme.brightness == Brightness.dark;
               return GoogleMap(
-                style: _mapStyleLimpio,
+                style: isDark ? _mapStyleOscuro : _mapStyleLimpio,
                 initialCameraPosition: CameraPosition(
                   target: _miPosicionActual ?? _centerCabimas,
                   zoom: 14.5,
@@ -583,6 +753,7 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                 myLocationButtonEnabled: false,
                 zoomControlsEnabled: false,
                 mapToolbarEnabled: false,
+                padding: const EdgeInsets.only(bottom: 30, left: 24),
               );
             },
           ),
@@ -621,30 +792,40 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                       ),
                       const SizedBox(width: 12),
 
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const ChatInboxScreen(miRol: 'conductor'))
+                      // --- FIX: GATILLO DINÁMICO DE BANDEJA DE MENSAJES ---
+                      StreamBuilder<QuerySnapshot>(
+                        stream: _chatsDirectosStream,
+                        builder: (context, snapshot) {
+                          bool tieneMensajesNuevos = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
+
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const ChatInboxScreen(miRol: 'conductor'))
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surface,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: colorScheme.primary.withValues(alpha: 0.5), width: 1.5),
+                                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 5)],
+                              ),
+                              child: Badge(
+                                backgroundColor: Colors.redAccent,
+                                label: Text(snapshot.data?.docs.length.toString() ?? ''),
+                                isLabelVisible: tieneMensajesNuevos, // Control dinámico del punto rojo
+                                child: Icon(Icons.forum_rounded, color: colorScheme.primary, size: 22),
+                              ),
+                            ),
                           );
                         },
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surface,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.5), width: 1.5),
-                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 5)],
-                          ),
-                          child: Badge(
-                            backgroundColor: Colors.redAccent,
-                            smallSize: 10,
-                            child: Icon(Icons.forum_rounded, color: colorScheme.primary, size: 22),
-                          ),
-                        ),
                       ),
                       const SizedBox(width: 12),
 
+                      // --- FIX: FOTO DE PERFIL DINÁMICA DEL CONDUCTOR ---
                       GestureDetector(
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const UserProfileScreen())),
                         child: Container(
@@ -653,10 +834,23 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                             shape: BoxShape.circle,
                             border: Border.all(color: colorScheme.primary, width: 2),
                           ),
-                          child: CircleAvatar(
-                            radius: 22,
-                            backgroundColor: colorScheme.primary,
-                            child: const Icon(Icons.person_rounded, color: Colors.white),
+                          child: StreamBuilder<DocumentSnapshot>(
+                            stream: _usuarioPerfilStream,
+                            builder: (context, userSnap) {
+                              String? photoUrl;
+                              if (userSnap.hasData && userSnap.data!.exists) {
+                                photoUrl = (userSnap.data!.data() as Map<String, dynamic>)['photoUrl'];
+                              }
+
+                              return CircleAvatar(
+                                radius: 22,
+                                backgroundColor: colorScheme.primary,
+                                backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                                child: photoUrl == null
+                                    ? const Icon(Icons.person_rounded, color: Colors.white)
+                                    : null,
+                              );
+                            },
                           ),
                         ),
                       )
@@ -697,7 +891,7 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
           ),
 
           Positioned(
-            bottom: 110, right: 24,
+            bottom: 88, left: 16,
             child: FloatingActionButton(
               heroTag: 'sos_btn',
               onPressed: _lanzarSOS,
@@ -707,7 +901,7 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
           ),
 
           Positioned(
-            bottom: 40, right: 24,
+            bottom: 24, left: 16,
             child: FloatingActionButton.extended(
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const WorkshopListScreen())),
               backgroundColor: colorScheme.surface,
@@ -716,7 +910,33 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
               icon: Icon(Icons.format_list_bulleted, color: colorScheme.primary),
               label: Text('Directorio', style: GoogleFonts.poppins(color: colorScheme.primary, fontWeight: FontWeight.bold)),
             ),
-          )
+          ),
+
+          if (!_conectado)
+            Positioned(
+              top: 60,
+              left: 20,
+              right: 20,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  color: Colors.redAccent.withValues(alpha: 0.95),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          "Sin conexión a Internet. Funciones limitadas.",
+                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

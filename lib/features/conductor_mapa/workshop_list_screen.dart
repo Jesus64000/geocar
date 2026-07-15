@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart'; // PAQUETE WHATSAPP
 import 'workshop_detail_screen.dart';
+import '../../widgets/shimmer_loading.dart';
 
 class WorkshopListScreen extends StatefulWidget {
   const WorkshopListScreen({super.key});
@@ -174,7 +175,7 @@ class _WorkshopListScreenState extends State<WorkshopListScreen> {
             stream: FirebaseFirestore.instance.collection('talleres').snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
+                return _buildSliverShimmerList(colorScheme);
               }
 
               // APLICAMOS LOS 3 FILTROS (Búsqueda, Categoría, Abierto)
@@ -253,7 +254,12 @@ class _WorkshopListScreenState extends State<WorkshopListScreen> {
                                     color: colorScheme.primary.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
-                                  child: fotos.isNotEmpty
+                                  child: (data['photoUrl'] != null && (data['photoUrl'] as String).isNotEmpty)
+                                      ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: Image.network(data['photoUrl'], fit: BoxFit.cover)
+                                  )
+                                      : fotos.isNotEmpty
                                       ? ClipRRect(
                                       borderRadius: BorderRadius.circular(20),
                                       child: Image.network(fotos.first, fit: BoxFit.cover)
@@ -324,6 +330,52 @@ class _WorkshopListScreenState extends State<WorkshopListScreen> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSliverShimmerList(ColorScheme colorScheme) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 20),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: colorScheme.outline.withValues(alpha: 0.05)),
+              ),
+              child: Row(
+                children: [
+                  ShimmerLoading.rounded(width: 80, height: 80, borderRadius: 20),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ShimmerLoading.rounded(width: 150, height: 18, borderRadius: 8),
+                        const SizedBox(height: 10),
+                        ShimmerLoading.rounded(width: 100, height: 14, borderRadius: 6),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            ShimmerLoading.rounded(width: 50, height: 14, borderRadius: 6),
+                            const SizedBox(width: 12),
+                            ShimmerLoading.rounded(width: 40, height: 14, borderRadius: 6),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+          childCount: 3,
+        ),
       ),
     );
   }

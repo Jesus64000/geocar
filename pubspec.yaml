@@ -16,7 +16,7 @@ dependencies:
   # --- Dependencias TestingCode (Sprint 0) ---
   # Backend y Base de Datos (Firebase)
   firebase_core: ^3.0.0
-  firebase_auth: ^5.0.0
+  firebase_auth: ^5.7.0
   cloud_firestore: ^5.0.0
 
   # Geolocalización y Mapas
@@ -33,6 +33,7 @@ dependencies:
   http: ^1.6.0
   firebase_messaging: ^15.2.10
   intl: ^0.20.2
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:
